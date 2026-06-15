@@ -1,0 +1,43 @@
+# Facebook / Meta Pixel setup
+
+The website is already wired so the Meta Pixel does not load until a visitor clicks Accept analytics in the cookie banner.
+
+## Step 1: Get your Pixel ID
+
+1. Go to Meta Business Suite.
+2. Open Events Manager.
+3. Choose Data Sources.
+4. Create or select your Pixel.
+5. Copy the numeric Pixel ID.
+
+## Step 2: Add it to the site
+
+Open script.js and find this line:
+
+const CONFIG = {
+  metaPixelId: 'REPLACE_WITH_YOUR_META_PIXEL_ID'
+};
+
+Replace REPLACE_WITH_YOUR_META_PIXEL_ID with the numeric Pixel ID.
+
+Example:
+
+const CONFIG = {
+  metaPixelId: '123456789012345'
+};
+
+## Step 3: Upload and test
+
+1. Upload the updated files to your host.
+2. Open the live website in a clean browser.
+3. Click Accept analytics.
+4. Use the Meta Pixel Helper Chrome extension or Events Manager Test Events to confirm PageView fires.
+5. Submit the contact form with test information and confirm the Lead event fires.
+
+## Step 4: Housing ads reminder
+
+Real estate related Meta ads usually need to be handled under Meta Special Ad Category rules for housing. Do not build audiences or ad copy in a way that excludes or targets protected classes. Have your broker review paid campaigns before launch.
+
+## Privacy reminder
+
+The Privacy Notice and Cookie Policy describe optional Meta Pixel tracking, but templates are not legal advice. Have privacy language reviewed before retargeting visitors.
