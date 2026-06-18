@@ -583,6 +583,18 @@ p {
   color: rgba(251, 247, 239, 0.76);
 }
 
+.area-board a {
+  color: var(--paper);
+  font-weight: 850;
+  text-decoration-color: rgba(242, 173, 140, 0.72);
+  text-underline-offset: 0.18em;
+}
+
+.area-board a:hover,
+.area-board a:focus-visible {
+  color: #f2ad8c;
+}
+
 .proof-section {
   background: var(--paper-deep);
 }

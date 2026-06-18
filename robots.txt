@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
+Disallow: /old/
 Sitemap: https://www.evankrealestate.com/sitemap.xml
