@@ -922,6 +922,29 @@ p {
   font-size: 0.9rem;
 }
 
+.cookie-actions {
+  justify-content: flex-end;
+}
+
+.cookie-banner .button {
+  min-width: 104px;
+  white-space: nowrap;
+}
+
+.cookie-banner .button.secondary {
+  color: var(--ink);
+  background: var(--white);
+  border-color: rgba(21, 18, 14, 0.22);
+  box-shadow: none;
+}
+
+.cookie-banner .button.secondary:hover,
+.cookie-banner .button.secondary:focus-visible {
+  color: var(--ink);
+  background: var(--paper-deep);
+  border-color: rgba(21, 18, 14, 0.36);
+}
+
 .policy-main {
   padding: clamp(4rem, 8vw, 7rem) 0;
 }

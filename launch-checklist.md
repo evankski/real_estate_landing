@@ -13,8 +13,8 @@ Review privacy.html.
 Review cookies.html.
 Review terms.html.
 Confirm the cookie banner appears on first visit.
-Confirm Reject tracking prevents Meta Pixel from loading.
-Confirm Accept analytics loads Meta Pixel only after the click.
+Confirm Reject prevents Meta Pixel from loading.
+Confirm Approve loads Meta Pixel only after the click.
 Confirm the Do Not Sell or Share link sets tracking to rejected.
 
 ## SEO

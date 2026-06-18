@@ -1,6 +1,6 @@
 (function () {
   const CONFIG = {
-    metaPixelId: 'REPLACE_WITH_YOUR_META_PIXEL_ID'
+    metaPixelId: '2061494168135844'
   };
 
   const year = document.getElementById('year');
@@ -54,7 +54,7 @@
 
   function getStoredChoice() {
     try {
-      return window.localStorage ? localStorage.getItem(consentKey) : null;
+      return window.localStorage ? window.localStorage.getItem(consentKey) : null;
     } catch (error) {
       return null;
     }
@@ -62,7 +62,7 @@
 
   function saveStoredChoice(choice) {
     try {
-      if (window.localStorage) localStorage.setItem(consentKey, choice);
+      if (window.localStorage) window.localStorage.setItem(consentKey, choice);
     } catch (error) {
       console.warn('Cookie choice could not be saved in this browser.', error);
     }
@@ -91,8 +91,21 @@
     return Boolean(pixelId && !pixelId.includes('REPLACE') && /^\d{5,}$/.test(pixelId));
   }
 
+  function grantMetaPixelConsent() {
+    try {
+      if (window.fbq) window.fbq('consent', 'grant');
+    } catch (error) {
+      console.warn('Meta Pixel consent grant was not available.', error);
+    }
+  }
+
   function loadMetaPixel(pixelId) {
-    if (!pixelIdIsReady(pixelId) || window.fbq) return;
+    if (!pixelIdIsReady(pixelId)) return;
+
+    if (window.fbq) {
+      grantMetaPixelConsent();
+      return;
+    }
 
     window.fbq = function () {
       window.fbq.callMethod ? window.fbq.callMethod.apply(window.fbq, arguments) : window.fbq.queue.push(arguments);
@@ -109,6 +122,7 @@
     const firstScript = document.getElementsByTagName('script')[0];
     firstScript.parentNode.insertBefore(script, firstScript);
 
+    grantMetaPixelConsent();
     window.fbq('init', pixelId);
     window.fbq('track', 'PageView');
   }

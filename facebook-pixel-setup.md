@@ -1,14 +1,14 @@
 # Facebook / Meta Pixel setup
 
-The website is already wired so the Meta Pixel does not load until a visitor clicks Accept analytics in the cookie banner.
+The website is already wired so the Meta Pixel does not load until a visitor clicks Approve in the cookie banner.
 
 ## Step 1: Get your Pixel ID
 
-1. Go to Meta Business Suite.
-2. Open Events Manager.
-3. Choose Data Sources.
-4. Create or select your Pixel.
-5. Copy the numeric Pixel ID.
+1. Go to Meta Business Suite or directly to Meta Events Manager: https://business.facebook.com/events_manager2/
+2. Open Data Sources.
+3. Create or select your website data source / Meta Pixel.
+4. Open Settings for that data source.
+5. Copy the numeric Pixel ID. Meta may also show it near the data source name or under dataset details.
 
 ## Step 2: Add it to the site
 
@@ -30,7 +30,7 @@ const CONFIG = {
 
 1. Upload the updated files to your host.
 2. Open the live website in a clean browser.
-3. Click Accept analytics.
+3. Click Approve in the cookie banner.
 4. Use the Meta Pixel Helper Chrome extension or Events Manager Test Events to confirm PageView fires.
 5. Submit the contact form with test information and confirm the Lead event fires.
 
