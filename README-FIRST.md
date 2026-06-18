@@ -26,7 +26,7 @@ launch-checklist.md
 2. Confirm Evan DRE #02102429 and Broker Karwowski, Inc. DRE #02224747 are exact.
 3. Have the broker review the homepage, footer, form consent language, Privacy Notice, Terms of Use, Cookie Policy, and any lead magnet copy.
 4. Have a qualified attorney review privacy and terms language before using paid traffic or Meta Pixel retargeting.
-5. Replace the Meta Pixel placeholder in script.js only after privacy review.
+5. Confirm the installed Meta Pixel ID in script.js is approved for use after privacy review.
 6. Upload the whole folder to GitHub Pages or your web host.
 7. Update sitemap.xml if the live domain changes.
 8. Submit the sitemap in Google Search Console.
@@ -53,6 +53,6 @@ Before launch, click each one. If any account uses a different URL, replace the 
 
 ## Cookie banner behavior
 
-The cookie banner is visible by default on a fresh browser visit. If someone already accepted or rejected tracking, the site remembers that choice and hides the banner on future visits. To reopen it, use the Cookie Settings link in the footer.
+The cookie banner is visible by default on a fresh browser visit. If someone already accepted or rejected tracking, the site remembers that choice and hides the banner on future visits. A browser-based Global Privacy Control signal is treated as an opt out of optional tracking. To reopen the banner, use the Cookie Settings link in the footer.
 
 For testing, use an incognito window or clear site data for the domain if you want to see the first visit experience again.

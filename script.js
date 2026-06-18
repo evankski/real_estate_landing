@@ -1,4 +1,6 @@
 (function () {
+  document.documentElement.classList.add('js');
+
   const CONFIG = {
     metaPixelId: '2061494168135844'
   };
@@ -70,6 +72,10 @@
 
   function updateCookieField(choice) {
     if (cookieChoiceField) cookieChoiceField.value = choice || 'not selected';
+  }
+
+  function browserSendsOptOutSignal() {
+    return navigator.globalPrivacyControl === true;
   }
 
   function hideCookieBanner() {
@@ -145,11 +151,14 @@
   }
 
   const existingChoice = getStoredChoice();
-  updateCookieField(existingChoice);
-  if (existingChoice === 'accepted') {
+  const browserChoice = browserSendsOptOutSignal() ? 'rejected' : null;
+  const effectiveChoice = browserChoice || existingChoice;
+
+  updateCookieField(effectiveChoice);
+  if (effectiveChoice === 'accepted') {
     loadMetaPixel(CONFIG.metaPixelId);
     hideCookieBanner();
-  } else if (existingChoice === 'rejected') {
+  } else if (effectiveChoice === 'rejected') {
     hideCookieBanner();
   } else {
     showCookieBanner();

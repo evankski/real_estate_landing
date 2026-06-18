@@ -6,8 +6,9 @@
   --paper-deep: #f0e7d8;
   --line: #e4dac9;
   --white: #ffffff;
-  --orange: #d75d2a;
-  --orange-dark: #ad431b;
+  --orange: #ad431b;
+  --orange-dark: #8f3413;
+  --clay: #ad431b;
   --sage: #85906f;
   --blue: #283d53;
   --shadow: 0 28px 80px rgba(25, 18, 12, 0.14);
@@ -103,17 +104,27 @@ button {
 .compliance-strip {
   color: rgba(255, 255, 255, 0.78);
   background: var(--ink);
-  font-size: 0.78rem;
+  font-size: 0.88rem;
+  font-weight: 760;
+  line-height: 1.35;
 }
 
 .strip-inner {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem 1rem;
+  gap: 0.35rem 0.75rem;
   align-items: center;
   justify-content: center;
   min-height: 34px;
   text-align: center;
+}
+
+.strip-inner span:nth-child(4) {
+  order: 5;
+}
+
+.strip-inner span:nth-child(5) {
+  order: 4;
 }
 
 .nav {
@@ -140,7 +151,7 @@ button {
   background: var(--ink);
   border-radius: 50%;
   font-weight: 900;
-  letter-spacing: -0.06em;
+  letter-spacing: 0;
 }
 
 .brand-text {
@@ -206,7 +217,7 @@ button {
 .hero {
   position: relative;
   overflow: hidden;
-  padding: clamp(5.5rem, 10vw, 9rem) 0 clamp(4rem, 8vw, 7rem);
+  padding: 4.5rem 0 4.75rem;
   color: var(--paper);
   background:
     radial-gradient(circle at 12% 15%, rgba(215, 93, 42, 0.28), transparent 32%),
@@ -227,7 +238,7 @@ button {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1.07fr) minmax(320px, 0.93fr);
-  align-items: center;
+  align-items: start;
   gap: clamp(2rem, 6vw, 5rem);
 }
 
@@ -236,7 +247,7 @@ button {
   color: #f2ad8c;
   font-size: 0.78rem;
   font-weight: 900;
-  letter-spacing: 0.15em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -249,21 +260,21 @@ h2,
 h3 {
   margin: 0;
   color: inherit;
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  line-height: 1.04;
+  letter-spacing: 0;
 }
 
 h1 {
   max-width: 880px;
-  font-size: clamp(3.35rem, 8.4vw, 7.2rem);
+  font-size: 4.15rem;
 }
 
 h2 {
-  font-size: clamp(2.2rem, 4.8vw, 4.7rem);
+  font-size: 3.25rem;
 }
 
 h3 {
-  font-size: clamp(1.24rem, 2vw, 1.62rem);
+  font-size: 1.5rem;
 }
 
 p {
@@ -274,7 +285,7 @@ p {
   max-width: 720px;
   margin-top: 1.5rem;
   color: rgba(251, 247, 239, 0.78);
-  font-size: clamp(1.14rem, 2vw, 1.38rem);
+  font-size: 1.28rem;
 }
 
 .hero-actions,
@@ -356,6 +367,8 @@ p {
 .hero-panel {
   display: grid;
   gap: 1rem;
+  width: min(100%, 420px);
+  justify-self: end;
 }
 
 .photo-frame {
@@ -407,13 +420,13 @@ p {
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .profile-card h2 {
-  font-size: clamp(1.55rem, 3vw, 2.25rem);
-  letter-spacing: -0.045em;
+  font-size: 2rem;
+  letter-spacing: 0;
 }
 
 .profile-card p,
@@ -576,7 +589,7 @@ p {
   color: #f2ad8c;
   font-size: 0.8rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -599,7 +612,7 @@ p {
   border-color: var(--ink);
 }
 
-.resource-card.featured p,
+.resource-card.featured p:not(.tag),
 .resource-card.featured li {
   color: rgba(251, 247, 239, 0.78);
 }
@@ -640,7 +653,7 @@ p {
   color: var(--orange);
   font-size: 0.78rem;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -841,7 +854,7 @@ p {
   color: var(--clay);
   font-size: 0.78rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -958,7 +971,7 @@ p {
 
 .policy-card h2 {
   margin-top: 0.3rem;
-  font-size: clamp(1.75rem, 3vw, 2.6rem);
+  font-size: 2.3rem;
 }
 
 .policy-card h3 {
@@ -973,15 +986,20 @@ p {
   margin-top: 0.8rem;
 }
 
-.reveal {
+.js .reveal {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 560ms ease, transform 560ms ease;
 }
 
-.reveal.is-visible {
+.js .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.js .hero .reveal {
+  opacity: 1;
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -989,7 +1007,7 @@ p {
     scroll-behavior: auto;
   }
 
-  .reveal,
+  .js .reveal,
   .button,
   .nav-links a {
     transition: none;
@@ -997,6 +1015,27 @@ p {
 }
 
 @media (max-width: 980px) {
+  h1 {
+    font-size: 3.75rem;
+  }
+
+  h2 {
+    font-size: 2.85rem;
+  }
+
+  h3 {
+    font-size: 1.38rem;
+  }
+
+  .hero-lede {
+    font-size: 1.2rem;
+  }
+
+  .profile-card h2,
+  .policy-card h2 {
+    font-size: 2rem;
+  }
+
   .mobile-menu-button {
     display: block;
   }
@@ -1040,6 +1079,10 @@ p {
     grid-template-columns: 1fr;
   }
 
+  .hero-panel {
+    justify-self: start;
+  }
+
   .card-grid.three,
   .series-grid,
   .area-board {
@@ -1056,12 +1099,36 @@ p {
 }
 
 @media (max-width: 660px) {
+  h1 {
+    font-size: 3.2rem;
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: 2.25rem;
+    line-height: 1.08;
+  }
+
+  h3 {
+    font-size: 1.24rem;
+    line-height: 1.16;
+  }
+
+  .hero-lede {
+    font-size: 1.1rem;
+  }
+
+  .profile-card h2,
+  .policy-card h2 {
+    font-size: 1.75rem;
+  }
+
   .container {
     width: min(100% - 1.25rem, var(--container));
   }
 
   .compliance-strip {
-    font-size: 0.72rem;
+    font-size: 0.82rem;
   }
 
   .nav {

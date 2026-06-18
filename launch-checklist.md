@@ -16,6 +16,7 @@ Confirm the cookie banner appears on first visit.
 Confirm Reject prevents Meta Pixel from loading.
 Confirm Approve loads Meta Pixel only after the click.
 Confirm the Do Not Sell or Share link sets tracking to rejected.
+Confirm Global Privacy Control prevents optional Meta Pixel tracking.
 
 ## SEO
 

@@ -12,13 +12,13 @@ The website is already wired so the Meta Pixel does not load until a visitor cli
 
 ## Step 2: Add it to the site
 
-Open script.js and find this line:
+The current installed Dataset / Pixel ID is:
 
 const CONFIG = {
-  metaPixelId: 'REPLACE_WITH_YOUR_META_PIXEL_ID'
+  metaPixelId: '2061494168135844'
 };
 
-Replace REPLACE_WITH_YOUR_META_PIXEL_ID with the numeric Pixel ID.
+If Meta gives you a different numeric Pixel ID later, replace 2061494168135844 with the new numeric Pixel ID.
 
 Example:
 
