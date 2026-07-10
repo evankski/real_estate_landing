@@ -17,6 +17,8 @@ thanks.html
 robots.txt
 sitemap.xml
 headshot.jpg
+headshot-480.jpg
+headshot-960.jpg
 facebook-pixel-setup.md
 photo-shot-list.md
 launch-checklist.md

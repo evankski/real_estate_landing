@@ -23,8 +23,7 @@
   <meta name="twitter:image" content="https://www.evankrealestate.com/headshot.jpg" />
 
   <title>East Bay Real Estate for Your Actual Week | Evan Karwowski</title>
-  <link rel="preload" href="headshot.jpg" as="image" />
-  <link rel="stylesheet" href="style.css?v=20260709e" />
+  <link rel="stylesheet" href="style.css?v=20260710c" />
 
   <script type="application/ld+json">
   {
@@ -128,7 +127,7 @@
     </nav>
   </header>
 
-  <main id="main">
+  <main id="main" tabindex="-1">
     <section class="hero" id="start" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div class="hero-copy reveal">
@@ -155,7 +154,16 @@
           <span class="route-label route-two">I-680</span>
           <span class="route-label route-three">I-580</span>
           <figure class="hero-portrait">
-            <img src="headshot.jpg" alt="Evan Karwowski outdoors under a large tree" width="1536" height="2304" fetchpriority="high" />
+            <img
+              src="headshot-960.jpg"
+              srcset="headshot-480.jpg 480w, headshot-960.jpg 960w"
+              sizes="(max-width: 700px) 84vw, 420px"
+              alt="Evan Karwowski outdoors under a large tree"
+              width="960"
+              height="1440"
+              fetchpriority="high"
+              decoding="async"
+            />
             <figcaption>
               <span>Evan Karwowski</span>
               <span>Grew up in Brentwood</span>
@@ -492,10 +500,10 @@
     </div>
   </footer>
 
-  <aside class="cookie-banner" id="cookieBanner" aria-live="polite" aria-label="Cookie and tracking choices" aria-describedby="cookieBannerText">
+  <aside class="cookie-banner" id="cookieBanner" hidden aria-hidden="true" aria-live="polite" aria-label="Cookie and tracking choices" aria-describedby="cookieBannerText">
     <div>
       <strong>Optional tracking</strong>
-      <p id="cookieBannerText">With your permission, this site uses Meta Pixel to measure visits, advertising, and form submissions. Declining keeps optional tracking off. You can change this later in the footer.</p>
+      <p id="cookieBannerText">With permission, this site uses Meta Pixel to measure visits and form submissions. Keeping it off disables optional tracking. You can change this later in the footer.</p>
     </div>
     <div class="cookie-actions">
       <button type="button" class="button small secondary" id="rejectCookies">Keep it off</button>
@@ -503,6 +511,6 @@
     </div>
   </aside>
 
-  <script src="script.js?v=20260709e" defer></script>
+  <script src="script.js?v=20260710c" defer></script>
 </body>
 </html>

@@ -13,6 +13,7 @@
 
   if (menuButton && navLinks) {
     const menuLabel = menuButton.querySelector('.sr-only');
+    const desktopMenuQuery = window.matchMedia('(min-width: 921px)');
 
     function setMenuState(isOpen) {
       navLinks.classList.toggle('is-open', isOpen);
@@ -34,19 +35,23 @@
       setMenuState(false);
       menuButton.focus();
     });
-  }
 
-  document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-    anchor.addEventListener('click', function (event) {
-      const targetId = this.getAttribute('href');
-      if (!targetId || targetId === '#') return;
-      const target = document.querySelector(targetId);
-      if (!target) return;
-      event.preventDefault();
-      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    document.addEventListener('pointerdown', (event) => {
+      if (menuButton.getAttribute('aria-expanded') !== 'true') return;
+      if (menuButton.contains(event.target) || navLinks.contains(event.target)) return;
+      setMenuState(false);
     });
-  });
+
+    const closeMenuAtDesktop = (event) => {
+      if (event.matches) setMenuState(false);
+    };
+
+    if (desktopMenuQuery.addEventListener) {
+      desktopMenuQuery.addEventListener('change', closeMenuAtDesktop);
+    } else {
+      desktopMenuQuery.addListener(closeMenuAtDesktop);
+    }
+  }
 
   const interestSelect = document.getElementById('interestSelect');
   document.querySelectorAll('[data-interest]').forEach((button) => {
@@ -63,6 +68,7 @@
   const doNotSellButton = document.getElementById('doNotSellButton');
   const cookieChoiceField = document.getElementById('cookieChoiceField');
   const consentKey = 'ek_cookie_tracking_choice';
+  let cookieReturnFocus = null;
 
   function getStoredChoice() {
     try {
@@ -95,7 +101,7 @@
     document.body.classList.remove('has-cookie-banner');
   }
 
-  function showCookieBanner() {
+  function showCookieBanner(moveFocus) {
     if (!cookieBanner) return;
     if (acceptCookies) {
       const optOutIsActive = browserSendsOptOutSignal();
@@ -106,6 +112,7 @@
     cookieBanner.removeAttribute('hidden');
     cookieBanner.setAttribute('aria-hidden', 'false');
     document.body.classList.add('has-cookie-banner');
+    if (moveFocus && rejectCookies) rejectCookies.focus({ preventScroll: true });
   }
 
   function pixelIdIsReady(pixelId) {
@@ -164,6 +171,10 @@
     }
 
     hideCookieBanner();
+    if (cookieReturnFocus && document.contains(cookieReturnFocus)) {
+      cookieReturnFocus.focus({ preventScroll: true });
+    }
+    cookieReturnFocus = null;
   }
 
   const existingChoice = getStoredChoice();
@@ -177,12 +188,17 @@
   } else if (effectiveChoice === 'rejected') {
     hideCookieBanner();
   } else {
-    showCookieBanner();
+    showCookieBanner(false);
   }
 
   if (acceptCookies) acceptCookies.addEventListener('click', () => setTrackingChoice('accepted'));
   if (rejectCookies) rejectCookies.addEventListener('click', () => setTrackingChoice('rejected'));
-  if (cookieSettingsButton) cookieSettingsButton.addEventListener('click', showCookieBanner);
+  if (cookieSettingsButton) {
+    cookieSettingsButton.addEventListener('click', () => {
+      cookieReturnFocus = cookieSettingsButton;
+      showCookieBanner(true);
+    });
+  }
   if (doNotSellButton) doNotSellButton.addEventListener('click', () => setTrackingChoice('rejected'));
 
   const isConfirmedLeadRedirect = document.body.dataset.leadSuccess === 'true'
@@ -202,6 +218,18 @@
 
   const form = document.getElementById('contactForm');
   if (form) {
+    const button = form.querySelector('button[type="submit"]');
+    const originalButtonHtml = button ? button.innerHTML : '';
+
+    function resetFormSubmitState() {
+      form.removeAttribute('aria-busy');
+      if (!button) return;
+      button.disabled = false;
+      button.innerHTML = originalButtonHtml;
+    }
+
+    window.addEventListener('pageshow', resetFormSubmitState);
+
     form.addEventListener('submit', (event) => {
       if (!form.checkValidity()) {
         event.preventDefault();
@@ -209,7 +237,6 @@
         return;
       }
 
-      const button = form.querySelector('button[type="submit"]');
       if (button) {
         button.disabled = true;
         button.textContent = 'Sending...';
