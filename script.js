@@ -12,18 +12,27 @@
   const navLinks = document.getElementById('primary-menu');
 
   if (menuButton && navLinks) {
-    menuButton.addEventListener('click', () => {
-      const isOpen = navLinks.classList.toggle('is-open');
+    const menuLabel = menuButton.querySelector('.sr-only');
+
+    function setMenuState(isOpen) {
+      navLinks.classList.toggle('is-open', isOpen);
       menuButton.setAttribute('aria-expanded', String(isOpen));
       document.body.classList.toggle('is-menu-open', isOpen);
+      if (menuLabel) menuLabel.textContent = isOpen ? 'Close menu' : 'Open menu';
+    }
+
+    menuButton.addEventListener('click', () => {
+      setMenuState(menuButton.getAttribute('aria-expanded') !== 'true');
     });
 
     navLinks.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        navLinks.classList.remove('is-open');
-        menuButton.setAttribute('aria-expanded', 'false');
-        document.body.classList.remove('is-menu-open');
-      });
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || menuButton.getAttribute('aria-expanded') !== 'true') return;
+      setMenuState(false);
+      menuButton.focus();
     });
   }
 
@@ -34,7 +43,8 @@
       const target = document.querySelector(targetId);
       if (!target) return;
       event.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     });
   });
 
@@ -87,6 +97,11 @@
 
   function showCookieBanner() {
     if (!cookieBanner) return;
+    if (acceptCookies) {
+      const optOutIsActive = browserSendsOptOutSignal();
+      acceptCookies.disabled = optOutIsActive;
+      acceptCookies.textContent = optOutIsActive ? 'Browser opt-out is on' : 'Allow tracking';
+    }
     cookieBanner.hidden = false;
     cookieBanner.removeAttribute('hidden');
     cookieBanner.setAttribute('aria-hidden', 'false');
@@ -134,10 +149,11 @@
   }
 
   function setTrackingChoice(choice) {
-    saveStoredChoice(choice);
-    updateCookieField(choice);
+    const enforcedChoice = choice === 'accepted' && browserSendsOptOutSignal() ? 'rejected' : choice;
+    saveStoredChoice(enforcedChoice);
+    updateCookieField(enforcedChoice);
 
-    if (choice === 'accepted') {
+    if (enforcedChoice === 'accepted') {
       loadMetaPixel(CONFIG.metaPixelId);
     } else if (window.fbq) {
       try {
@@ -169,6 +185,21 @@
   if (cookieSettingsButton) cookieSettingsButton.addEventListener('click', showCookieBanner);
   if (doNotSellButton) doNotSellButton.addEventListener('click', () => setTrackingChoice('rejected'));
 
+  const isConfirmedLeadRedirect = document.body.dataset.leadSuccess === 'true'
+    && new URLSearchParams(window.location.search).get('submitted') === '1';
+
+  if (isConfirmedLeadRedirect && getStoredChoice() === 'accepted' && !browserSendsOptOutSignal()) {
+    try {
+      if (!window.sessionStorage || window.sessionStorage.getItem('ek_lead_tracked') !== 'true') {
+        loadMetaPixel(CONFIG.metaPixelId);
+        if (window.fbq) window.fbq('track', 'Lead');
+        if (window.sessionStorage) window.sessionStorage.setItem('ek_lead_tracked', 'true');
+      }
+    } catch (error) {
+      console.warn('Lead tracking was not available in this browser.', error);
+    }
+  }
+
   const form = document.getElementById('contactForm');
   if (form) {
     form.addEventListener('submit', (event) => {
@@ -183,10 +214,7 @@
         button.disabled = true;
         button.textContent = 'Sending...';
       }
-
-      if (window.fbq && getStoredChoice() === 'accepted') {
-        window.fbq('track', 'Lead');
-      }
+      form.setAttribute('aria-busy', 'true');
     });
   }
 

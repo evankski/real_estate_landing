@@ -13,8 +13,8 @@ Review privacy.html.
 Review cookies.html.
 Review terms.html.
 Confirm the cookie banner appears on first visit.
-Confirm Reject prevents Meta Pixel from loading.
-Confirm Approve loads Meta Pixel only after the click.
+Confirm Keep it off prevents Meta Pixel from loading.
+Confirm Allow tracking loads Meta Pixel only after the click.
 Confirm the Do Not Sell or Share link sets tracking to rejected.
 Confirm Global Privacy Control prevents optional Meta Pixel tracking.
 
@@ -30,7 +30,8 @@ Use consistent NAP details across website, Google profile, social profiles, and 
 
 Submit a test form.
 Confirm the email arrives.
-Confirm the form records contact consent, privacy acknowledgment, optional marketing consent, and cookie choice.
+Confirm the form records the question, contact consent, optional marketing consent, and cookie choice.
+Confirm successful submissions return to the branded thanks page.
 Confirm your follow up does not imply legal, lending, tax, insurance, or financial advice.
 
 ## Paid traffic

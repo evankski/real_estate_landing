@@ -13,6 +13,7 @@ privacy.html
 terms.html
 cookies.html
 accessibility.html
+thanks.html
 robots.txt
 sitemap.xml
 headshot.jpg
@@ -53,6 +54,6 @@ Before launch, click each one. If any account uses a different URL, replace the 
 
 ## Cookie banner behavior
 
-The cookie banner is visible by default on a fresh browser visit. If someone already accepted or rejected tracking, the site remembers that choice and hides the banner on future visits. A browser-based Global Privacy Control signal is treated as an opt out of optional tracking. To reopen the banner, use the Cookie Settings link in the footer.
+The cookie banner is visible by default on a fresh browser visit. If someone already allowed or declined tracking, the site remembers that choice and hides the banner on future visits. A browser-based Global Privacy Control signal is treated as an opt out of optional tracking. To reopen the banner, use the Cookie Settings link in the footer.
 
 For testing, use an incognito window or clear site data for the domain if you want to see the first visit experience again.
