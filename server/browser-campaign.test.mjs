@@ -31,13 +31,14 @@ function element(properties = {}) {
 function openForm({
   campaignId = 'C1', requestType = 'Home comparison', interest = 'Buying a home',
   pathname = '/compare/', thanksPath = '/thanks/compare/', query = '',
-  extra = {}, responses = [Response.json({ success: true })], storageBlocked = false
+  extra = {}, responses = [Response.json({ success: true })], storageBlocked = false,
+  privacyChoice, gpc = false
 } = {}) {
   const fields = Object.entries({
     campaign_id: campaignId, request_type: requestType, interest, cta_source: `${campaignId} form`,
     name: 'Local Test', email: 'local@example.invalid', phone: '',
     contact_method: 'email', area: 'Brentwood', budget: 'Still deciding',
-    timeline: 'Just researching', contact_consent: 'on', ...extra
+    timeline: 'Just researching', contact_consent: 'on', cookie_choice: 'not selected', ...extra
   }).map(([name, value]) => element({
     name, value, type: ['campaign_id', 'request_type', 'interest', 'cta_source'].includes(name) ? 'hidden' : 'text',
     willValidate: !['campaign_id', 'request_type', 'interest', 'cta_source'].includes(name),
@@ -85,11 +86,17 @@ function openForm({
     contactForm: form, requestType: fields.namedItem('request_type'),
     ctaSourceField: fields.namedItem('cta_source'), areaSelect: area,
     contactMethod: fields.namedItem('contact_method'),
-    requestLabel: element(), formStatus: element(), formStepStatus: element(), phoneHint: element()
+    requestLabel: element(), formStatus: element(), formStepStatus: element(), phoneHint: element(),
+    cookieChoiceField: fields.namedItem('cookie_choice'),
+    cookieBanner: element(), cookieBannerText: element(),
+    acceptCookies: element(), rejectCookies: element(),
+    privacyStatus: element(), doNotSellButton: element()
   };
   const cta = element({ dataset: { source: 'campaign hero', interest: 'sell', request: 'Pricing report' } });
   const requests = [];
   const redirects = [];
+  const injectedScripts = [];
+  const firstScript = { parentNode: { insertBefore(script) { injectedScripts.push(script); } } };
   const stored = new Map();
   const sessionStorage = {
     getItem(key) { return stored.get(key) ?? null; },
@@ -113,11 +120,16 @@ function openForm({
     getElementById(id) { return ids[id] || null; },
     querySelector() { return null; },
     querySelectorAll(selector) { return selector.startsWith('[data-interest]') ? [cta] : []; },
-    createElement() { return element(); }
+    createElement() { return element(); },
+    getElementsByTagName() { return [firstScript]; }
   };
+  const privacyStored = new Map(privacyChoice ? [['ek_cookie_tracking_choice_v3', privacyChoice]] : []);
   const window = {
     location, sessionStorage,
-    localStorage: { getItem() { return null; } },
+    localStorage: {
+      getItem(key) { return privacyStored.get(key) ?? null; },
+      setItem(key, value) { privacyStored.set(key, value); }
+    },
     fetch, AbortController, setTimeout, clearTimeout, addEventListener() {}
   };
   class FormData {
@@ -129,17 +141,19 @@ function openForm({
     }
   }
   runInNewContext(script, {
-    window, document, navigator: {}, URL, URLSearchParams, Date, FormData, fetch,
+    window, document, navigator: { globalPrivacyControl: gpc }, URL, URLSearchParams, Date, FormData, fetch,
     AbortController, console: { warn() {} }
   }, { timeout: 1000, filename: 'script.js' });
   return {
-    fields, ids, form, cta, next, back, submit, steps, requests, redirects, stored,
+    fields, ids, form, cta, next, back, submit, steps, requests, redirects, stored, injectedScripts,
+    pixelCalls: () => Array.from(window.fbq?.queue || [], args => Array.from(args)),
     submitForm: () => form.emit('submit', { preventDefault() {} })
   };
 }
 
 test('campaign intent and service stay fixed while source and allowed area can be selected', async () => {
   const page = openForm({ query: '?intent=sell&area=Oakley&utm_source=instagram&email=not-captured' });
+  assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.fields.namedItem('interest').value, 'Buying a home');
   assert.equal(page.fields.namedItem('request_type').value, 'Home comparison');
   assert.equal(page.fields.namedItem('cta_source').value, 'C1 form');
@@ -170,6 +184,7 @@ test('campaign intent and service stay fixed while source and allowed area can b
   assert.equal(receipt.thanksPath, '/thanks/compare/');
   assert.equal(receipt.campaignId, 'C1');
   assert.equal(receipt.status, 'accepted');
+  assert.equal(page.injectedScripts.length, 0, 'contact permission is separate from advertising permission');
   await page.submitForm();
   assert.equal(page.requests.length, 1, 'repeat submits after acceptance do not duplicate the inquiry');
 });
@@ -258,4 +273,44 @@ test('storage-blocked browsers receive truthful in-place confirmation without an
   assert.equal(page.submit.disabled, true);
   await page.submitForm();
   assert.equal(page.requests.length, 1);
+});
+
+test('tracking refusal or GPC never blocks an inquiry or creates a Meta event', async () => {
+  for (const preferences of [
+    { privacyChoice: 'rejected' },
+    { privacyChoice: 'accepted', gpc: true }
+  ]) {
+    const page = openForm(preferences);
+    await page.submitForm();
+    await page.submitForm();
+    assert.equal(page.requests.length, 1);
+    assert.equal(page.requests[0].payload.cookie_choice, 'rejected');
+    assert.equal(page.redirects.length, 1);
+    assert.equal(page.injectedScripts.length, 0);
+    assert.deepEqual(page.pixelCalls(), []);
+  }
+});
+
+test('an opted-in form sends PageView only and leaves Lead for its accepted thank-you receipt', async () => {
+  const page = openForm({ privacyChoice: 'accepted' });
+  assert.equal(page.injectedScripts.length, 1);
+  await page.submitForm();
+  await page.submitForm();
+  const events = page.pixelCalls().filter(args => args[0] === 'track');
+  assert.deepEqual(events, [['track', 'PageView']]);
+  assert.equal(page.redirects.length, 1);
+  assert.equal(JSON.parse(page.stored.get(RECEIPT_KEY)).status, 'accepted');
+  assert.ok(!JSON.stringify(page.pixelCalls()).includes('local@example.invalid'));
+});
+
+test('a failed opted-in form submission never records a Meta Lead', async () => {
+  const page = openForm({
+    privacyChoice: 'accepted',
+    responses: [Response.json({ success: false }, { status: 502 })]
+  });
+  await page.submitForm();
+  await page.submitForm();
+  assert.deepEqual(page.pixelCalls().filter(args => args[0] === 'track'), [['track', 'PageView']]);
+  assert.equal(page.stored.has(RECEIPT_KEY), false);
+  assert.equal(page.redirects.length, 0);
 });

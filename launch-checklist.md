@@ -6,13 +6,19 @@ US housing advertising. The site is still plain HTML/CSS/JavaScript and supports
 GitHub Pages. This is a documented risk review and set of implementation fixes,
 not a legal opinion, certification, or guarantee against claims.
 
-The current code keeps Meta Pixel paused. The inquiry form requests permission
-for a response only. Before paid advertising or automated follow-up, resolve the
+Evan authorized Meta Pixel activation on October 20, 2026. The current code
+loads it only after a fresh visitor opt-in and sends PageView and accepted-inquiry
+Lead events. Saved opt-outs and GPC remain honored. The inquiry form requests
+permission for a response only. Before paid advertising or automated follow-up, resolve the
 business and account checks below with WR Properties and, where necessary,
 California privacy/advertising counsel. Website disclaimers do not replace
 lawful targeting, consent, service delivery, or data handling.
 
 ## Owner decisions confirmed October 20, 2026
+
+- Meta Pixel is enabled at Evan's explicit request, with tracking off until the
+  visitor accepts. This supersedes the earlier local instruction to keep it
+  paused; it does not verify account settings or authorize marketing follow-up.
 
 - Paid ads will target the **United States only**. This confirms the planned
   campaign geography; it does not prevent people elsewhere from visiting.
@@ -35,9 +41,11 @@ two-business-day delivery commitment after receiving the necessary details.
 There is no booking-provider link yet: scheduling forms request preferred times
 and require Evan's personal confirmation. Checklist email copies and
 personalized work are fulfilled personally, not by a newly added autoresponder.
-Videos and the authorized property/event details remain unconfigured. See
-`CAMPAIGN-PAGES.md` for routes and activation instructions. These additions do
-not activate ads, pixels, FUB marketing rules, call recording, or a calendar.
+The offer pages include a locally hosted sample video; Evan's final videos and
+authorized property/event details remain to be supplied. See `CAMPAIGN-PAGES.md`
+for routes and configuration instructions. These page additions do not activate
+ads, FUB marketing rules, call recording, or a calendar. Pixel activation is the
+separate October 20 owner decision documented above.
 
 - Verified agent DRE 02102429 and responsible broker Winning Results Realty,
   Inc., DRE 02029047, doing business as WR Properties. Preserved that identity
@@ -49,9 +57,10 @@ not activate ads, pixels, FUB marketing rules, call recording, or a calendar.
 - Added a Notice at Collection before the form fields. Expanded privacy/cookie
   notices to match actual recipients, data categories, uses, retention criteria,
   browser storage, rights requests, GPC, and the different older DNT signal.
-- Paused Meta loading/events, retained opt-outs, discarded legacy opt-ins, and
-  made GPC opt-outs persistent. Added visible browser opt-out status, cross-tab
-  revocation, policy links, and a privacy-request route that works without JS.
+- Initially paused Meta during the October 19 review. Enabled optional
+  measurement October 20 at Evan's request using a fresh v3 preference key;
+  v2/v1 opt-outs remain honored and old opt-ins are ignored. Persistent GPC,
+  visible browser status, cross-tab revocation and privacy controls remain.
 - Limited the form's permission to the selected contact method for the inquiry.
   Both email delivery and FUB record the consent version and wording. The FUB
   message explicitly says marketing permission was not collected; server
@@ -74,7 +83,7 @@ not activate ads, pixels, FUB marketing rules, call recording, or a calendar.
 | Privacy-law coverage | Determine whether Evan, WR, or the relevant combined business meets CCPA/CPRA applicability criteria. Do not infer coverage from this website's traffic alone. Also inventory actual disclosures over the prior 12 months; source code cannot establish that history. |
 | Privacy operations | Assign responsibility for access/correction/deletion/opt-out requests, identity verification, authorized agents, deadlines, provider coordination, and suppression records. If covered and not exclusively online, check the toll-free request-channel requirement; the published 925 number is not toll-free. |
 | Retention and providers | Adopt an actual category-based retention/deletion schedule and configure FUB, email, host logs and backups accordingly. Review contracts and provider uses. FormSubmit's public policy does not establish a detailed retention/deletion schedule; verify it or choose an approved alternative before relying on it for an ad campaign. |
-| Meta | Pixel is paused. Confirm account ownership, current Business Tools terms, automatic advanced matching, automatic events, data sources, permissions and any CAPI/offline/custom-audience integrations. Follow facebook-pixel-setup.md before enabling measurement. |
+| Meta | Enabled October 20 at Evan's request, with visitor opt-in required for PageView and accepted-inquiry Lead events. Account ownership/settings and separate integrations remain unverified. See facebook-pixel-setup.md for checks; activation is not evidence that the account was inspected. |
 | Market/geography | Evan confirmed October 20 that paid ads will target the United States only. Check that campaign settings match this decision. Actual visitors and activities can still create other state/country obligations; review again before expanding targeting. |
 | Hosting and delivery | These changes are local, not deployed. Verify the live HTTPS site, domain, published policies, consent behavior and actual delivery after publishing. The live www domain could not be fetched by the research tool; that result alone does not establish an outage. |
 
@@ -206,7 +215,7 @@ requirements. [FTC CAN-SPAM guide](https://www.ftc.gov/business-guidance/resourc
 ## Verification and deployment record
 
 Local checks cover form/consent wording, API validation, email fallback, no
-unconfirmed lead conversion, paused/future-enabled consent paths, persistent
+unconfirmed lead conversion, opt-in-only measurement paths, persistent
 GPC, cross-tab revocation, privacy links, campaign propagation, and source-file
 protection. Browser checks cover narrow/mobile privacy controls and keyboard
 access to the last menu item in a short landscape viewport. These do not verify

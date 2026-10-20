@@ -93,6 +93,6 @@ Check the listing role, event status and media rights before publication; update
 - The C2 emailed checklist is a request for Evan to fulfill personally. There is no automatic resource email/attachment service. A personalized outline is requested only when the visitor selects its separate unchecked option.
 - `/preferences/` offers direct contact instructions; it is not an authenticated CRM preferences portal.
 - The existing secure lead endpoint and its documented fallback handle inquiries. This work does not add the manual’s broader durable outbox, CRM reconciliation worker, calendar webhooks or reminder system.
-- No ads, retargeting audiences, marketing sequences or external accounts are launched or configured by these pages.
+- No ads, retargeting audiences, marketing sequences or external accounts are launched or configured by these pages. Separately, Evan authorized Meta Pixel activation on October 20, 2026. PageView and accepted-inquiry Lead measurement require a fresh tracking opt-in; saved opt-outs and GPC remain honored. This does not create marketing consent. See `facebook-pixel-setup.md`.
 
 Before paid traffic, verify the real deployed form-to-inbox/CRM path and Evan’s fulfillment process. Add real videos and booking integration when available; do not substitute “sent,” “booked” or “delivered” claims for actions the system has not completed.

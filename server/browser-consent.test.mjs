@@ -5,8 +5,8 @@ import { runInNewContext } from 'node:vm';
 
 const script = await readFile(new URL('../script.js', import.meta.url), 'utf8');
 const NOW = 1_800_000_000_000;
-const CHOICE_KEY = 'ek_cookie_tracking_choice_v2';
-const LEGACY_CHOICE_KEY = 'ek_cookie_tracking_choice';
+const CHOICE_KEY = 'ek_cookie_tracking_choice_v3';
+const LEGACY_CHOICE_KEYS = ['ek_cookie_tracking_choice_v2', 'ek_cookie_tracking_choice'];
 const RECEIPT_KEY = 'ek_lead_receipt';
 const NEUTRAL_TITLE = 'Let’s talk about your next move.';
 
@@ -40,12 +40,12 @@ function element(textContent = '') {
   };
 }
 
-// Default cases execute unchanged production code. Future-enabled cases opt in
-// explicitly and replace only the single feature flag, guarded against drift.
+// Default cases execute unchanged production code with measurement enabled.
+// Only rollback coverage replaces the single feature flag, guarded against drift.
 // Injected script elements are recorded, never loaded; no network exists here.
 function openPage({
   choice, gpc = false, thanks = false, search, receipt,
-  measurementEnabled = false,
+  measurementEnabled,
   href, links = [], campaignId = '', confirmedTitle, confirmedMessage,
   localStorage = storage(choice ? { [CHOICE_KEY]: choice } : {}),
   sessionStorage = storage(receipt === undefined ? {} : {
@@ -88,11 +88,9 @@ function openPage({
     addEventListener(name, callback) { windowListeners.set(name, callback); }
   };
   let executable = script;
-  if (measurementEnabled) {
-    const flag = 'metaPixelEnabled: false,';
-    assert.equal(script.split(flag).length - 1, 1, 'Expected one production-disabled Meta flag');
-    executable = script.replace(flag, 'metaPixelEnabled: true,');
-  }
+  const flag = 'metaPixelEnabled: true,';
+  assert.equal(script.split(flag).length - 1, 1, 'Expected the production Meta flag to be enabled');
+  if (measurementEnabled === false) executable = script.replace(flag, 'metaPixelEnabled: false,');
   class FixedDate extends Date {
     static now() { return NOW; }
   }
@@ -106,8 +104,8 @@ function openPage({
   return { ids, anchors, injectedScripts, window, localStorage, sessionStorage, calls, leadCount, storageEvent };
 }
 
-test('production keeps measurement paused even when an allow handler is invoked', () => {
-  const page = openPage();
+test('disabling the feature for rollback prevents any allow action from loading Meta', () => {
+  const page = openPage({ measurementEnabled: false });
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.window.fbq, undefined);
   assert.equal(page.ids.cookieBanner.hidden, true);
@@ -123,9 +121,9 @@ test('production keeps measurement paused even when an allow handler is invoked'
   assert.equal(page.window.fbq, undefined);
 });
 
-test('production sends no pixel or Lead for a confirmed receipt and stored acceptance', () => {
+test('disabled rollback mode sends no pixel or Lead even with a receipt and stored acceptance', () => {
   const page = openPage({
-    choice: 'accepted', thanks: true, search: '?submitted=1',
+    measurementEnabled: false, choice: 'accepted', thanks: true, search: '?submitted=1',
     receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
@@ -139,8 +137,8 @@ test('production sends no pixel or Lead for a confirmed receipt and stored accep
   assert.equal(page.leadCount(), 0);
 });
 
-test('when enabled, fresh visitors load no pixel until they explicitly allow tracking', () => {
-  const page = openPage({ measurementEnabled: true });
+test('production fresh visitors load no pixel until they explicitly allow tracking', () => {
+  const page = openPage({ });
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.window.fbq, undefined);
   assert.equal(page.ids.cookieBanner.hidden, false);
@@ -158,8 +156,8 @@ test('when enabled, fresh visitors load no pixel until they explicitly allow tra
   assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
 });
 
-test('when enabled, automatic configuration is disabled before Pixel initialization', () => {
-  const page = openPage({ measurementEnabled: true, choice: 'accepted' });
+test('production disables automatic configuration before Pixel initialization', () => {
+  const page = openPage({ choice: 'accepted' });
   const calls = page.calls();
   const autoConfigIndex = calls.findIndex(args => args[0] === 'set' && args[1] === 'autoConfig');
   const initIndex = calls.findIndex(args => args[0] === 'init');
@@ -167,46 +165,64 @@ test('when enabled, automatic configuration is disabled before Pixel initializat
   assert.deepEqual(calls[autoConfigIndex], ['set', 'autoConfig', false, '2061494168135844']);
 });
 
-test('legacy acceptance is not reused when measurement becomes enabled', () => {
-  const page = openPage({
-    measurementEnabled: true,
-    localStorage: storage({ [LEGACY_CHOICE_KEY]: 'accepted' })
+for (const legacyKey of LEGACY_CHOICE_KEYS) {
+  test(`${legacyKey} acceptance is not reused by the current consent version`, () => {
+    const page = openPage({ localStorage: storage({ [legacyKey]: 'accepted' }) });
+    assert.equal(page.injectedScripts.length, 0);
+    assert.equal(page.ids.cookieChoiceField.value, 'not selected');
+    assert.equal(page.ids.cookieBanner.hidden, false);
+    assert.equal(page.localStorage.getItem(CHOICE_KEY), null);
+    page.ids.acceptCookies.click();
+    assert.equal(page.localStorage.getItem(CHOICE_KEY), 'accepted');
+    assert.equal(page.injectedScripts.length, 1);
   });
-  assert.equal(page.injectedScripts.length, 0);
-  assert.equal(page.ids.cookieChoiceField.value, 'not selected');
-  assert.equal(page.ids.cookieBanner.hidden, false);
-  assert.equal(page.localStorage.getItem(CHOICE_KEY), null);
-  page.ids.acceptCookies.click();
-  assert.equal(page.localStorage.getItem(CHOICE_KEY), 'accepted');
-  assert.equal(page.injectedScripts.length, 1);
+
+  test(`${legacyKey} rejection remains honored by the current consent version`, () => {
+    const page = openPage({ localStorage: storage({ [legacyKey]: 'rejected' }) });
+    assert.equal(page.injectedScripts.length, 0);
+    assert.equal(page.ids.cookieBanner.hidden, true);
+    assert.equal(page.ids.cookieChoiceField.value, 'rejected');
+    assert.match(page.ids.privacyStatus.textContent, /Opt-out request honored/);
+    assert.equal(page.ids.doNotSellButton.getAttribute('aria-pressed'), 'true');
+    const nextVisit = openPage({ localStorage: page.localStorage });
+    assert.equal(nextVisit.injectedScripts.length, 0);
+    assert.equal(nextVisit.ids.cookieChoiceField.value, 'rejected');
+  });
+}
+
+test('either legacy rejection takes precedence over an acceptance from another old version', () => {
+  for (const [first, second] of [['accepted', 'rejected'], ['rejected', 'accepted']]) {
+    const page = openPage({
+      localStorage: storage({ [LEGACY_CHOICE_KEYS[0]]: first, [LEGACY_CHOICE_KEYS[1]]: second })
+    });
+    assert.equal(page.injectedScripts.length, 0);
+    assert.equal(page.ids.cookieChoiceField.value, 'rejected');
+  }
 });
 
-test('legacy rejection remains honored when measurement becomes enabled', () => {
+test('a fresh current-version permission may replace an older opt-out', () => {
   const page = openPage({
-    measurementEnabled: true,
-    localStorage: storage({ [LEGACY_CHOICE_KEY]: 'rejected' })
+    localStorage: storage({ [LEGACY_CHOICE_KEYS[0]]: 'rejected', [CHOICE_KEY]: 'accepted' })
   });
-  assert.equal(page.injectedScripts.length, 0);
-  assert.equal(page.ids.cookieBanner.hidden, true);
-  assert.equal(page.ids.cookieChoiceField.value, 'rejected');
-  assert.match(page.ids.privacyStatus.textContent, /Opt-out request honored/);
-  assert.equal(page.ids.doNotSellButton.getAttribute('aria-pressed'), 'true');
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.ids.cookieChoiceField.value, 'accepted');
+  assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
 });
 
 test('declining tracking loads no pixel and is remembered on another visit', () => {
-  const page = openPage({ measurementEnabled: true });
+  const page = openPage({ });
   page.ids.rejectCookies.click();
   assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
   assert.equal(page.ids.cookieChoiceField.value, 'rejected');
   assert.equal(page.ids.cookieBanner.hidden, true);
   assert.equal(page.injectedScripts.length, 0);
-  const nextVisit = openPage({ measurementEnabled: true, localStorage: page.localStorage });
+  const nextVisit = openPage({ localStorage: page.localStorage });
   assert.equal(nextVisit.injectedScripts.length, 0);
   assert.equal(nextVisit.ids.cookieBanner.hidden, true);
 });
 
 test('withdrawing previously granted tracking sends consent revoke', () => {
-  const page = openPage({ measurementEnabled: true, choice: 'accepted' });
+  const page = openPage({ choice: 'accepted' });
   page.ids.doNotSellButton.click();
   assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
   assert.ok(page.calls().some(args => args[0] === 'consent' && args[1] === 'revoke'));
@@ -215,7 +231,7 @@ test('withdrawing previously granted tracking sends consent revoke', () => {
 });
 
 test('rejection or cleared preferences in another tab revoke existing consent', () => {
-  const page = openPage({ measurementEnabled: true, choice: 'accepted' });
+  const page = openPage({ choice: 'accepted' });
   page.localStorage.setItem(CHOICE_KEY, 'rejected');
   page.storageEvent({ key: CHOICE_KEY });
   assert.deepEqual(page.calls().at(-1), ['consent', 'revoke']);
@@ -233,7 +249,7 @@ test('rejection or cleared preferences in another tab revoke existing consent', 
 });
 
 test('unrelated storage events cannot change privacy state', () => {
-  const page = openPage({ measurementEnabled: true, choice: 'accepted' });
+  const page = openPage({ choice: 'accepted' });
   const initialCalls = page.calls();
   page.localStorage.setItem(CHOICE_KEY, 'rejected');
   page.storageEvent({ key: 'unrelated-browser-key' });
@@ -241,9 +257,36 @@ test('unrelated storage events cannot change privacy state', () => {
   assert.equal(page.ids.cookieChoiceField.value, 'accepted');
 });
 
+test('current permission granted in another tab loads once without inventing a lead', () => {
+  const page = openPage();
+  assert.equal(page.injectedScripts.length, 0);
+  page.localStorage.setItem(CHOICE_KEY, 'accepted');
+  page.storageEvent({ key: CHOICE_KEY });
+  page.storageEvent({ key: CHOICE_KEY });
+  assert.equal(page.ids.cookieChoiceField.value, 'accepted');
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
+  assert.equal(page.leadCount(), 0);
+});
+
+test('unavailable local storage does not load Meta before a visitor explicitly allows it', () => {
+  const page = openPage({
+    localStorage: {
+      getItem() { throw new Error('Storage unavailable'); },
+      setItem() { throw new Error('Storage unavailable'); }
+    }
+  });
+  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.ids.cookieBanner.hidden, false);
+  page.ids.acceptCookies.click();
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
+  assert.equal(page.leadCount(), 0);
+});
+
 test('GPC overrides a stored acceptance and cannot be overridden by an allow action', () => {
   const page = openPage({
-    measurementEnabled: true, choice: 'accepted', gpc: true, thanks: true, search: '?submitted=1',
+    choice: 'accepted', gpc: true, thanks: true, search: '?submitted=1',
     receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
@@ -260,13 +303,13 @@ test('GPC overrides a stored acceptance and cannot be overridden by an allow act
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.leadCount(), 0);
   const laterWithoutGpc = openPage({
-    measurementEnabled: true, localStorage: page.localStorage
+    localStorage: page.localStorage
   });
   assert.equal(laterWithoutGpc.injectedScripts.length, 0);
   assert.equal(laterWithoutGpc.ids.cookieChoiceField.value, 'rejected');
 });
 
-test('production persists and visibly honors GPC even while measurement is paused', () => {
+test('production persists and visibly honors GPC with measurement enabled', () => {
   const page = openPage({ choice: 'accepted', gpc: true });
   assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
   assert.match(page.ids.privacyStatus.textContent, /Opt-out request honored/);
@@ -275,14 +318,14 @@ test('production persists and visibly honors GPC even while measurement is pause
 });
 
 test('visiting the thank-you URL directly never records a lead or confirms delivery', () => {
-  const page = openPage({ measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1' });
+  const page = openPage({ choice: 'accepted', thanks: true, search: '?submitted=1' });
   assert.equal(page.leadCount(), 0);
   assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
 });
 
 test('a recent accepted receipt records one lead, is consumed, and cannot replay', () => {
   const page = openPage({
-    measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
+    choice: 'accepted', thanks: true, search: '?submitted=1',
     receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 9 * 60 * 1000 }
   });
   assert.equal(page.leadCount(), 1);
@@ -292,7 +335,7 @@ test('a recent accepted receipt records one lead, is consumed, and cannot replay
   page.ids.acceptCookies.click();
   assert.equal(page.leadCount(), 1);
   const reload = openPage({
-    measurementEnabled: true, thanks: true, search: '?submitted=1',
+    thanks: true, search: '?submitted=1',
     localStorage: page.localStorage, sessionStorage: page.sessionStorage
   });
   assert.equal(reload.leadCount(), 0);
@@ -301,7 +344,7 @@ test('a recent accepted receipt records one lead, is consumed, and cannot replay
 
 test('an accepted receipt waits for tracking consent and still records only once', () => {
   const page = openPage({
-    measurementEnabled: true, thanks: true, search: '?submitted=1',
+    thanks: true, search: '?submitted=1',
     receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
@@ -313,6 +356,33 @@ test('an accepted receipt waits for tracking consent and still records only once
   assert.equal(page.leadCount(), 1);
 });
 
+test('a confirmed inquiry with tracking refused remains confirmed without any Meta script or event', () => {
+  const page = openPage({
+    choice: 'rejected', thanks: true, search: '?submitted=1',
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
+  });
+  assert.equal(page.ids.thanksTitle.textContent, 'Your inquiry is on its way.');
+  assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
+  page.ids.rejectCookies.click();
+  assert.equal(page.injectedScripts.length, 0);
+  assert.deepEqual(page.calls(), []);
+});
+
+test('cross-tab permission records a previously confirmed inquiry once and GPC still prevents transfer', () => {
+  for (const gpc of [false, true]) {
+    const page = openPage({
+      gpc, thanks: true, search: '?submitted=1',
+      receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
+    });
+    page.localStorage.setItem(CHOICE_KEY, 'accepted');
+    page.storageEvent({ key: CHOICE_KEY });
+    page.storageEvent({ key: CHOICE_KEY });
+    assert.equal(page.injectedScripts.length, gpc ? 0 : 1);
+    assert.equal(page.leadCount(), gpc ? 0 : 1);
+    assert.equal(page.ids.cookieChoiceField.value, gpc ? 'rejected' : 'accepted');
+  }
+});
+
 for (const [reason, receipt] of [
   ['expired at the ten-minute boundary', { status: 'accepted', acceptedAt: NOW - 10 * 60 * 1000 }],
   ['unknown status', { status: 'pending', acceptedAt: NOW - 1000 }],
@@ -322,7 +392,7 @@ for (const [reason, receipt] of [
 ]) {
   test(`${reason} receipts never record a lead or confirm delivery`, () => {
     const page = openPage({
-      measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
+      choice: 'accepted', thanks: true, search: '?submitted=1',
       receipt: typeof receipt === 'string' ? receipt : { thanksPath: '/thanks.html', campaignId: '', ...receipt }
     });
     assert.equal(page.leadCount(), 0);
@@ -332,7 +402,7 @@ for (const [reason, receipt] of [
 
 test('a receipt without the expected redirect flag does not record a lead', () => {
   const page = openPage({
-    measurementEnabled: true, choice: 'accepted', thanks: true,
+    choice: 'accepted', thanks: true,
     receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.leadCount(), 0);
@@ -353,7 +423,8 @@ test('campaign confirmation uses the accepted destination and fixed offer, with 
   assert.equal(page.ids.thanksTitle.textContent, 'Your comparison request is on its way.');
   assert.equal(page.ids.thanksMessage.textContent, 'Evan will review your preferences.');
   assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
-  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.leadCount(), 1);
 });
 
 for (const [reason, receipt] of [
@@ -363,7 +434,7 @@ for (const [reason, receipt] of [
 ]) {
   test(`campaign confirmation rejects ${reason}`, () => {
     const page = openPage({
-      measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
+      choice: 'accepted', thanks: true, search: '?submitted=1',
       href: 'https://www.evankrealestate.com/thanks/compare/', campaignId: 'C1',
       receipt: { status: 'accepted', acceptedAt: NOW - 1000, ...receipt }
     });

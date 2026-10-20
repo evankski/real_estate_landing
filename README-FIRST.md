@@ -170,11 +170,15 @@ Brokerage attribution is WR Properties / Winning Results Realty, Inc.,
 CA DRE #02029047. Evan's CA DRE number is 02102429.
 Update the sitemap and canonical URLs if the domain changes.
 
-Meta Pixel is paused by default (`metaPixelEnabled: false` in `script.js`).
-The browser preserves opt-outs, honors Global Privacy Control persistently,
-and does not reuse legacy opt-ins. Footer controls show the current status.
-See `facebook-pixel-setup.md` before enabling measurement; update the policy
-wording and verify account settings as part of that change.
+Evan authorized Meta Pixel activation on October 20, 2026.
+`metaPixelEnabled: true` enables measurement only after a visitor chooses
+**Allow tracking**. The site sends PageView and delivery-service-accepted
+inquiry Lead events; it does not add form answers to those event parameters.
+The v3 tracking preference requires a fresh opt-in, preserves v2/v1 opt-outs,
+and honors Global Privacy Control persistently. Footer controls show the
+current browser status. This choice does not authorize marketing follow-up.
+See `facebook-pixel-setup.md` for the implementation and account checks.
+Activation does not establish Meta account ownership, settings or live receipt.
 
 The October 19, 2026 review, completed fixes, sources, and open business-side
 checks are in `launch-checklist.md`. The review is not legal certification.

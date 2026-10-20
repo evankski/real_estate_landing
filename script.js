@@ -2,9 +2,9 @@
   document.documentElement.classList.add('js');
 
   const CONFIG = {
-    // Enable only after the Meta settings and launch checks in
-    // launch-checklist.md are complete. Visitor permission is still required.
-    metaPixelEnabled: false,
+    // Enabled at Evan's request. Load only after the visitor allows tracking;
+    // stored opt-outs and Global Privacy Control continue to take priority.
+    metaPixelEnabled: true,
     metaPixelId: '2061494168135844'
   };
 
@@ -63,7 +63,7 @@
   const doNotSellButton = document.getElementById('doNotSellButton');
   const cookieChoiceField = document.getElementById('cookieChoiceField');
   const privacyStatus = document.getElementById('privacyStatus');
-  const consentKey = 'ek_cookie_tracking_choice_v2';
+  const consentKey = 'ek_cookie_tracking_choice_v3';
   const leadReceiptKey = 'ek_lead_receipt';
   let cookieReturnFocus = null;
   let confirmedLead = false;
@@ -103,9 +103,10 @@
       if (!window.localStorage) return null;
       const choice = window.localStorage.getItem(consentKey);
       if (choice === 'accepted' || choice === 'rejected') return choice;
-      // Keep past opt-outs. A prior opt-in does not authorize the revised
-      // measurement disclosure.
-      return window.localStorage.getItem('ek_cookie_tracking_choice') === 'rejected' ? 'rejected' : null;
+      // Require fresh permission for the reactivated Pixel. Keep rejections
+      // from either earlier version rather than silently dropping an opt-out.
+      const previousKeys = ['ek_cookie_tracking_choice_v2', 'ek_cookie_tracking_choice'];
+      return previousKeys.some(key => window.localStorage.getItem(key) === 'rejected') ? 'rejected' : null;
     } catch (error) {
       return null;
     }
@@ -154,7 +155,7 @@
     }
     const bannerText = document.getElementById('cookieBannerText');
     if (bannerText) bannerText.textContent = CONFIG.metaPixelEnabled
-      ? 'Allow Meta to receive page visits and successful inquiry events for advertising measurement? Your choice is optional. You can browse and contact Evan with tracking off.'
+      ? 'Allow Meta to receive page visits and accepted inquiry events for advertising measurement? Your choice is optional. You can browse and contact Evan with tracking off.'
       : 'Meta advertising measurement is currently paused. No Meta Pixel script or events are loaded. You can keep tracking off and review the privacy notice below.';
     cookieBanner.hidden = false;
     cookieBanner.removeAttribute('hidden');

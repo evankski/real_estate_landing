@@ -1,59 +1,66 @@
-# Meta Pixel activation checklist
+# Meta Pixel configuration and verification
 
-Meta Pixel is **paused** in `script.js` (`metaPixelEnabled: false`). No Meta script
-or events are loaded, including for visitors with an older saved opt-in. The
-site and inquiry form work normally. Pixel ID 2061494168135844 is retained as a
-configuration value, not proof of a connected or verified advertising account.
+Evan explicitly authorized activation on October 20, 2026. Meta Pixel is enabled
+in `script.js` (`metaPixelEnabled: true`) and remains **opt-in only**. Pixel ID
+`2061494168135844` is configured; this does not establish dataset ownership,
+verified account settings or successful Meta receipt. No live Meta requests
+were made as part of this notice/configuration update.
 
-## Before enabling measurement
+## Implemented behavior
 
-1. Confirm the intended Meta account owns the dataset and review the current
-   Business Tools terms and privacy requirements with WR Properties. Check any
-   connected CAPI, offline events, audience uploads or other data integrations;
-   this site's cookie switch cannot control separate account integrations.
-2. Turn off automatic advanced matching and automatic/event-setup collection
-   that could read form fields or page metadata beyond the intended events.
-   The script also queues `autoConfig: false` before initialization. Verify the
-   resulting network payloads; do not treat that single setting as a guarantee.
-3. Do not put names, emails, phone numbers, financial details or other sensitive
-   information in campaign URLs or Meta event parameters. Meta can receive a
-   page URL and network/browser information even when no form fields are passed.
-4. Review the active uses with the broker/privacy adviser, including California
-   sale/sharing duties, provider terms and the actual targeting geography.
-   Update `privacy.html`, `cookies.html`, and the visible status copy to describe
-   the enabled practice accurately before changing the flag.
-5. Keep rejection as easy as acceptance. Preserve stored opt-outs and GPC
-   enforcement. Do not reuse a past opt-in after materially changing the
-   disclosure. The current v2 preference key ignores v1 opt-ins; if changing
-   terms again, migrate existing rejections while requiring a fresh opt-in.
-6. After the preceding checks, change `metaPixelEnabled` to `true`. Do not add
-   an unconditional Pixel snippet, noscript image, or second tag-manager route.
+- Until a visitor chooses **Allow tracking**, the site does not load the Meta
+  script or send optional events. The inquiry form works with tracking off.
+- Allowed measurement sends `PageView` and `Lead` after the inquiry-delivery
+  service accepts a submission. Form answers are not added to event parameters.
+  A Lead event does not mean an appointment is booked or an email has been read.
+- The tracking key is `ek_cookie_tracking_choice_v3`. Older v2/v1 opt-ins are
+  ignored; their opt-outs remain honored. The v1 key is
+  `ek_cookie_tracking_choice`; v2 is `ek_cookie_tracking_choice_v2`.
+- **Keep tracking off**, the footer opt-out and detected Global Privacy Control
+  keep measurement off. GPC opt-outs persist after the signal is removed.
+  Preference changes are also handled across open tabs.
+- Failed storage persistence must not silently enable tracking. Withdrawal
+  revokes future optional measurement; it cannot erase data already received
+  by Meta or necessarily remove existing cookies.
+- Tracking permission is separate from inquiry-response permission. Neither
+  automatically grants marketing-call, marketing-text or newsletter consent.
 
-## Verify in a review deployment
+Do not add an unconditional Pixel snippet, noscript image, second tag-manager
+route or additional events that bypass these controls.
 
-- Fresh visitors send no requests to Meta before choosing **Allow tracking**.
-- **Keep tracking off**, the footer opt-out and GPC prevent measurement; the
-  opt-out remains after removing GPC and applies across open tabs.
-- If storage is blocked, failed persistence must not silently enable tracking.
-- Once explicitly allowed, inspect PageView and accepted-inquiry Lead events.
-  There must be no contact details, budget, message, sensitive URL data or
-  automatic form events in the payloads.
-- A direct visit, refresh or replay of the thank-you URL must not create another
-  lead conversion. Declining measurement must not prevent an inquiry.
-- Withdrawal stops future optional tracking; explain that it cannot undo data
-  previously received by Meta. Verify provider/account handling too.
+## Account checks still unverified
 
-Use only a clearly identified test inquiry approved for the intended delivery
-route. Unit tests use mocks and do not verify Meta settings or real delivery.
+Check the intended account/dataset ownership and settings in Meta. Review
+automatic advanced matching and automatic/event-setup collection so they do
+not collect form fields or information beyond the intended events. The site
+queues `autoConfig: false`; that does not verify the account or every payload.
+Inspect separate CAPI, offline events, audience uploads and connected tools;
+the website's cookie controls cannot configure those integrations.
+
+Keep names, emails, phone numbers and sensitive information out of campaign
+URLs and event parameters. Ordinary pixel events can still disclose page,
+browser, network and identifier information. These checks remain follow-up;
+they do not reverse Evan's instruction to enable the consent-gated Pixel.
+
+## Verify the deployed behavior
+
+- Fresh visitors and visitors with only an old opt-in send no Meta requests
+  before choosing **Allow tracking**.
+- Old and current opt-outs and GPC prevent loading and events.
+- After a fresh opt-in, inspect PageView and accepted-inquiry Lead behavior;
+  event parameters must not include form answers or automatic form events.
+- Direct visits, refreshes and replayed thank-you URLs must not create extra
+  lead conversions. Declining tracking must not block inquiries.
+- Check withdrawal, cross-tab changes, storage failure and visible status.
+
+Use a controlled test inquiry only when testing the intended delivery route.
+Mocked local tests do not prove account settings or real Meta receipt.
 
 ## Housing advertisements
 
-Evan confirmed on October 20, 2026 that paid ads will target the United States
-only. Apply that geography in campaign settings; the website itself remains
-publicly accessible.
-
-Declare Housing for these real-estate campaigns. Inspect current
-Ads Manager targeting, exclusions, placement and lead-form restrictions before
-launch. A website disclosure does not fix a discriminatory audience or a missing
-DRE disclosure in the creative. See `launch-checklist.md` for the full review and
-open business-side items.
+Evan confirmed October 20, 2026 that paid ads will target the United States
+only. Apply that geography in campaign settings; the website remains public.
+No campaign was launched by enabling the Pixel. Use the Housing category for
+the planned real-estate campaigns and check current targeting, placement and
+lead-form settings when preparing ads. See `launch-checklist.md` for the
+existing advertising review and remaining business-side checks.
