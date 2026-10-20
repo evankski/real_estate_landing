@@ -1,6 +1,8 @@
 # Campaign pages
 
-The campaign library follows the supplied [campaign manual](/Users/evan/Downloads/Evan_Karwowski_Complete_Real_Estate_Campaign_Manual.pdf) and the existing website theme. Evan confirmed the delivery promise: personalized comparisons, buyer outlines and preliminary seller reviews are due within two business days after the necessary details arrive. A call remains optional.
+The campaign library follows the supplied [campaign manual](/Users/evan/Downloads/Evan_Karwowski_Complete_Real_Estate_Campaign_Manual.pdf). Its updated presentation uses the existing green palette with the centered headline, video and prominent action structure of the [Acquisition.com workshop landing page](https://lp.acquisition.com/workshop-sales-4b). Evan confirmed the delivery promise: personalized comparisons, buyer outlines and preliminary seller reviews are due within two business days after the necessary details arrive. A call remains optional.
+
+The main offers place the video and request button on the first screen, followed immediately by the inquiry section. Supporting booking, confirmation, preferences and resource pages share the same typography, compact header and buttons. The main homepage is unchanged. Booking pages put the form beside the introduction on desktop. No autoplay, countdown, invented testimonial or video-watching requirement is added.
 
 ## Routes
 
@@ -30,7 +32,7 @@ Thank-you URLs alone are not proof of a received inquiry, sent resource or booke
 ## Edit and build
 
 - `scripts/campaign-config.mjs` holds shared identity, C1–C3 copy, the nine-item checklist, video configuration, booking links and optional property/event data.
-- `scripts/generate-campaigns.mjs` creates the route HTML using the current shared footer and privacy controls.
+- `scripts/generate-campaigns.mjs` creates the route HTML using the current shared footer and privacy controls. Its `firstScreen` object holds the compact offer headlines, descriptions, CTA labels and delivery summaries; keep these consistent with the full campaign copy.
 - `campaigns.css` supplies the campaign layouts and `campaigns.js` handles campaign-specific interactions; the site’s existing styles and lead flow remain shared.
 
 Regenerate after changing campaign configuration:
@@ -47,11 +49,21 @@ npm run build
 
 The build regenerates the campaign pages and copies permitted public assets into `dist/`. Keep generated HTML in version control alongside its source configuration. GitHub Pages can serve the generated HTML directly; it cannot execute the `/api/leads` backend. See `README-FIRST.md` for the existing server/FUB setup and FormSubmit fallback requirements. This page work does not deploy anything.
 
-## Add the real videos later
+## Sample video and replacement
 
-The `videos` keys are `compare`, `buyer-plan`, `seller-plan`, `thanks`, and `open-house`. They are currently `null`. The offer pages use a real portrait and readable explanation in the reserved space, with no fake thumbnail, play control or invented recording. Optional thank-you/property video sections appear only when configured.
+The `videos` keys are `compare`, `buyer-plan`, `seller-plan`, `thanks`, and `open-house`. The three offer pages currently use the same real, playable sample clip. Its configuration includes `demo: true`, source credit and a transcript that identifies it as a sample. It is scenic stock footage, not Evan's sales presentation. `thanks` and `open-house` remain `null`.
 
-Place the authorized recording, poster and captions in `media/campaigns/`. Then replace the relevant `null` in `scripts/campaign-config.mjs`:
+The sample is a 12-second silent excerpt of [View Of The Sea And Waves Crashing by Mark Hajewski](https://www.pexels.com/video/view-of-the-sea-and-waves-crashing-2046575/), downloaded from the original Pexels download link on October 20, 2026. The [Pexels License](https://www.pexels.com/license/) permits free website/commercial use and editing; attribution is optional, and credit is retained here and in the configuration. It is licensed stock footage, not a CC0 dedication. Do not imply the photographer endorses the brokerage.
+
+Local files:
+
+- `media/campaigns/sample-coast.mp4`: H.264 MP4, 960 × 540, 24 fps, 12 seconds, no audio, optimized for progressive playback.
+- `media/campaigns/sample-coast-poster.jpg`: a genuine frame extracted from the same footage at one second.
+- `media/campaigns/sample-coast-en.vtt`: identifies the silent footage and absence of dialogue.
+
+The original source file was downloaded from `https://videos.pexels.com/video-files/2046575/2046575-hd_1920_1080_30fps.mp4`; the local demo is trimmed, scaled and compressed. It contains no external embed or tracking service.
+
+For Evan's actual VSL, place the authorized recording, genuine poster and accurate captions in `media/campaigns/`. Replace the complete relevant video object in `scripts/campaign-config.mjs` so the sample flag, source credits and sample transcript do not carry over:
 
 ```js
 compare: {
@@ -63,7 +75,7 @@ compare: {
 },
 ```
 
-These are example filenames, not provided media. The generator requires existing local files under `/media/campaigns/`: `.mp4` or `.webm` video, `.jpg`, `.png` or `.webp` poster, and `.vtt` captions. Filenames must begin with a letter or digit and use only letters, digits, periods, underscores or hyphens. Use lowercase extensions. External video URLs and nested media directories are not supported. The transcript is required plain text, not HTML or a path.
+The replacement filenames above are examples, not provided media. The generator requires existing local files under `/media/campaigns/`: `.mp4` or `.webm` video, `.jpg`, `.png` or `.webp` poster, and `.vtt` captions. Filenames must begin with a letter or digit and use only letters, digits, periods, underscores or hyphens. Use lowercase extensions. External video URLs and nested media directories are not supported. The transcript is required plain text, not HTML or a path.
 
 Regenerate and check the controls, captions, transcript and mobile layout with the actual recording. The full offer, sample and form must remain usable without playing it.
 

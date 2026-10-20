@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { publicPathFromUrl, serveAsset, SITE_ROOT } from './server.mjs';
+import { Writable } from 'node:stream';
+import { once } from 'node:events';
+import { publicPathFromUrl, serveAsset, createSiteServer, SITE_ROOT } from './server.mjs';
 import { listPublicFiles, PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES } from './public-files.mjs';
 
 async function publicFixture(t) {
@@ -77,6 +79,116 @@ test('nested campaign pages and optional media are served with the expected cont
     assert.equal(response.status, 200, route);
     assert.match(response.headers.get('Content-Type'), /text\/html/, route);
   }
+});
+
+async function videoFixture(t, content = Buffer.from(Array.from({ length: 256 }, (_, index) => index))) {
+  const root = await publicFixture(t);
+  await mkdir(join(root, 'media/campaigns'), { recursive: true });
+  await writeFile(join(root, 'media/campaigns/demo.mp4'), content);
+  return { root, content };
+}
+
+test('video byte ranges return exactly the requested bytes for initial playback and seeking', async (t) => {
+  const { root, content } = await videoFixture(t);
+  for (const [range, start, end] of [
+    ['bytes=0-1', 0, 1],
+    ['bytes=80-119', 80, 119],
+    ['bytes=240-', 240, 255],
+    ['bytes=-10', 246, 255],
+    ['bytes=250-999999999999999999999', 250, 255],
+    ['bytes=-999999999999999999999', 0, 255],
+    ['BYTES= 12-14', 12, 14]
+  ]) {
+    const response = await serveAsset('/media/campaigns/demo.mp4', 'GET', root, { Range: range });
+    assert.equal(response.status, 206, range);
+    assert.equal(response.headers.get('Content-Type'), 'video/mp4');
+    assert.equal(response.headers.get('Accept-Ranges'), 'bytes');
+    assert.equal(response.headers.get('Content-Range'), `bytes ${start}-${end}/${content.length}`);
+    assert.equal(response.headers.get('Content-Length'), String(end - start + 1));
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), content.subarray(start, end + 1));
+  }
+});
+
+test('video HEAD exposes the full length and ignores Range without sending content', async (t) => {
+  const { root, content } = await videoFixture(t);
+  const response = await serveAsset('/media/campaigns/demo.mp4', 'HEAD', root, { Range: 'bytes=0-1' });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Content-Length'), String(content.length));
+  assert.equal(response.headers.get('Accept-Ranges'), 'bytes');
+  assert.equal(response.headers.get('Content-Range'), null);
+  assert.equal(await response.text(), '');
+});
+
+test('unsatisfiable video ranges identify the real length without reading the file into the response', async (t) => {
+  const { root } = await videoFixture(t);
+  for (const range of ['bytes=256-', 'bytes=999999999999999999999-', 'bytes=-0']) {
+    const response = await serveAsset('/media/campaigns/demo.mp4', 'GET', root, { Range: range });
+    assert.equal(response.status, 416, range);
+    assert.equal(response.headers.get('Content-Range'), 'bytes */256');
+    assert.equal(response.headers.get('Content-Length'), '0');
+    assert.equal(await response.text(), '');
+  }
+});
+
+test('unsupported or malformed ranges and unmatched If-Range safely return the complete video', async (t) => {
+  const { root, content } = await videoFixture(t);
+  for (const headers of [
+    { Range: 'items=0-2' }, { Range: 'bytes=10-2' },
+    { Range: 'bytes=nope' }, { Range: 'bytes=-' },
+    { Range: 'bytes=0-1,100-101' },
+    { Range: 'bytes=0-1', 'If-Range': '"an-unmatched-version"' }
+  ]) {
+    const response = await serveAsset('/media/campaigns/demo.mp4', 'GET', root, headers);
+    assert.equal(response.status, 200, JSON.stringify(headers));
+    assert.equal(response.headers.get('Content-Length'), String(content.length));
+    assert.equal(response.headers.get('Content-Range'), null);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), content);
+  }
+});
+
+test('empty public media has a valid empty response and no satisfiable byte range', async (t) => {
+  const { root } = await videoFixture(t, Buffer.alloc(0));
+  const response = await serveAsset('/media/campaigns/demo.mp4', 'GET', root);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Content-Length'), '0');
+  assert.equal(await response.text(), '');
+  const range = await serveAsset('/media/campaigns/demo.mp4', 'GET', root, { Range: 'bytes=0-' });
+  assert.equal(range.status, 416);
+  assert.equal(range.headers.get('Content-Range'), 'bytes */0');
+  assert.equal(await range.text(), '');
+});
+
+test('Range never bypasses public-path restrictions or symlink checks', async (t) => {
+  const { root } = await videoFixture(t);
+  await writeFile(join(root, 'private.mp4'), 'private video content');
+  await symlink(join(root, 'private.mp4'), join(root, 'media/campaigns/linked.mp4'));
+  for (const path of ['/private.mp4', '/media/campaigns/../../private.mp4', '/media/campaigns/linked.mp4']) {
+    const response = await serveAsset(path, 'GET', root, { Range: 'bytes=0-5' });
+    assert.equal(response.status, 404, path);
+    assert.equal(response.headers.get('Content-Range'), null);
+    assert.equal(await response.text(), 'Not found');
+  }
+});
+
+test('the HTTP handler forwards Range headers and streams the partial response', async () => {
+  const chunks = [];
+  const outgoing = new Writable({
+    write(chunk, encoding, done) { chunks.push(Buffer.from(chunk)); done(); }
+  });
+  outgoing.writeHead = (status, headers) => {
+    outgoing.status = status;
+    outgoing.headers = headers;
+    outgoing.headersSent = true;
+  };
+  const finished = once(outgoing, 'finish');
+  const server = createSiteServer({});
+  server.emit('request', {
+    method: 'GET', url: '/headshot-480.jpg', headers: { range: 'bytes=0-15' }
+  }, outgoing);
+  await finished;
+  assert.equal(outgoing.status, 206);
+  assert.equal(outgoing.headers['content-length'], '16');
+  assert.deepEqual(Buffer.concat(chunks), (await readFile(join(SITE_ROOT, 'headshot-480.jpg'))).subarray(0, 16));
 });
 
 test('public pages have appropriate media types and HEAD does not return body', async () => {

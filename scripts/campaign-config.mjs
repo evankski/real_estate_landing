@@ -240,8 +240,9 @@ export const checklist = [
   },
 ];
 
-// Set an entry only after the actual recording is available.
-// Future video object:
+// The three offer pages currently share a clearly identified stock demo.
+// Replace the demo with Evan's actual recording when available.
+// Video object:
 // { src, poster, captions, transcript, title }
 // src: /media/campaigns/safe-filename.mp4 (or .webm).
 // poster: /media/campaigns/safe-filename.jpg (or .png / .webp).
@@ -253,10 +254,23 @@ export const checklist = [
 // transcript: required complete plain-text transcript, not HTML or a file path.
 // title: descriptive accessible title for the recording.
 // Do not load an empty iframe or show a functional-looking play control for null.
+const sampleVideo = {
+  src: '/media/campaigns/sample-coast.mp4',
+  poster: '/media/campaigns/sample-coast-poster.jpg',
+  captions: '/media/campaigns/sample-coast-en.vtt',
+  transcript: 'Sample video only. Twelve seconds of silent stock footage show ocean waves moving along a rocky coastline. There is no dialogue or audio. This demonstrates the video player; Evan’s explanation of the offer will replace it.',
+  title: 'Sample video: coastal footage',
+  demo: true,
+  durationSeconds: 12,
+  creditLabel: 'Mark Hajewski / Pexels',
+  creditUrl: 'https://www.pexels.com/video/view-of-the-sea-and-waves-crashing-2046575/',
+  licenseUrl: 'https://www.pexels.com/license/',
+};
+
 export const videos = {
-  compare: null,
-  'buyer-plan': null,
-  'seller-plan': null,
+  compare: { ...sampleVideo },
+  'buyer-plan': { ...sampleVideo },
+  'seller-plan': { ...sampleVideo },
   thanks: null,
   'open-house': null,
 };

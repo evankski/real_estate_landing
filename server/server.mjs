@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { open } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { handleLead } from './lead-handler.mjs';
@@ -17,23 +19,67 @@ const TYPES = {
   '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
 
-export async function serveAsset(rawUrl, method = 'GET', root = SITE_ROOT) {
+function byteRange(value, size) {
+  // A single byte range covers browser video seeking. Ignore unsupported units,
+  // malformed ranges, and multipart requests rather than pretending to satisfy
+  // them. BigInt prevents large numeric offsets from overflowing or rounding.
+  const match = /^bytes=\s*(\d*)-(\d*)\s*$/i.exec(value || '');
+  if (!match || (!match[1] && !match[2])) return null;
+  const length = BigInt(size);
+  if (!match[1]) {
+    const suffix = BigInt(match[2]);
+    if (!suffix || !length) return { unsatisfiable: true };
+    return { start: Number(suffix >= length ? 0n : length - suffix), end: size - 1 };
+  }
+  const start = BigInt(match[1]);
+  const end = match[2] ? BigInt(match[2]) : length - 1n;
+  if (match[2] && end < start) return null;
+  if (start >= length) return { unsatisfiable: true };
+  return { start: Number(start), end: Number(end >= length ? length - 1n : end) };
+}
+
+export async function serveAsset(rawUrl, method = 'GET', root = SITE_ROOT, requestHeaders = {}) {
   if (!['GET', 'HEAD'].includes(method)) return new Response('Method not allowed', { status: 405 });
   const relativePath = publicPathFromUrl(rawUrl);
   if (!relativePath) return new Response('Not found', { status: 404 });
+  let file;
   try {
     const filename = await resolvePublicFile(root, relativePath);
     if (!filename) return new Response('Not found', { status: 404 });
+    file = await open(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const info = await file.stat();
+    if (!info.isFile()) throw new Error('Not a regular public file');
     const extension = relativePath.slice(relativePath.lastIndexOf('.'));
-    return new Response(method === 'HEAD' ? null : await readFile(filename), {
-      headers: {
-        'Content-Type': TYPES[extension] || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'no-cache'
-      }
+    const headers = new Headers({
+      'Content-Type': TYPES[extension] || 'application/octet-stream',
+      'Content-Length': String(info.size),
+      'Accept-Ranges': 'bytes',
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'no-cache'
     });
+    const requested = new Headers(requestHeaders);
+    // HEAD ignores Range. No strong validator is issued by this development
+    // server, so If-Range cannot match and gets the complete representation.
+    const range = method === 'GET' && !requested.has('If-Range')
+      ? byteRange(requested.get('Range'), info.size) : null;
+    if (range?.unsatisfiable) {
+      headers.set('Content-Range', `bytes */${info.size}`);
+      headers.set('Content-Length', '0');
+      return new Response(null, { status: 416, headers });
+    }
+    if (range) {
+      headers.set('Content-Range', `bytes ${range.start}-${range.end}/${info.size}`);
+      headers.set('Content-Length', String(range.end - range.start + 1));
+    }
+    if (method === 'HEAD' || info.size === 0) return new Response(null, { headers });
+    const stream = file.createReadStream(range ? { start: range.start, end: range.end } : {});
+    // The stream now owns the handle and closes it on completion or cancellation.
+    file = null;
+    return new Response(Readable.toWeb(stream), { status: range ? 206 : 200, headers });
   } catch {
     return new Response('Not found', { status: 404 });
+  } finally {
+    await file?.close();
   }
 }
 
@@ -51,13 +97,17 @@ export function createSiteServer(env = process.env) {
         }
         response = await handleLead(new Request(url, init), env);
       } else {
-        response = await serveAsset(rawUrl, incoming.method);
+        response = await serveAsset(rawUrl, incoming.method, SITE_ROOT, incoming.headers);
       }
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
-      outgoing.end(Buffer.from(await response.arrayBuffer()));
+      if (response.body) await pipeline(Readable.fromWeb(response.body), outgoing);
+      else outgoing.end();
     } catch {
-      if (!outgoing.headersSent) outgoing.writeHead(500, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
-      outgoing.end('Unable to complete request');
+      if (outgoing.headersSent) outgoing.destroy();
+      else {
+        outgoing.writeHead(500, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+        outgoing.end('Unable to complete request');
+      }
     }
   });
 }
