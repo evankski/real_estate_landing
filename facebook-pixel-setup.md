@@ -1,43 +1,59 @@
-# Facebook / Meta Pixel setup
+# Meta Pixel activation checklist
 
-The website is already wired so the Meta Pixel does not load until a visitor clicks Approve in the cookie banner.
+Meta Pixel is **paused** in `script.js` (`metaPixelEnabled: false`). No Meta script
+or events are loaded, including for visitors with an older saved opt-in. The
+site and inquiry form work normally. Pixel ID 2061494168135844 is retained as a
+configuration value, not proof of a connected or verified advertising account.
 
-## Step 1: Get your Pixel ID
+## Before enabling measurement
 
-1. Go to Meta Business Suite or directly to Meta Events Manager: https://business.facebook.com/events_manager2/
-2. Open Data Sources.
-3. Create or select your website data source / Meta Pixel.
-4. Open Settings for that data source.
-5. Copy the numeric Pixel ID. Meta may also show it near the data source name or under dataset details.
+1. Confirm the intended Meta account owns the dataset and review the current
+   Business Tools terms and privacy requirements with WR Properties. Check any
+   connected CAPI, offline events, audience uploads or other data integrations;
+   this site's cookie switch cannot control separate account integrations.
+2. Turn off automatic advanced matching and automatic/event-setup collection
+   that could read form fields or page metadata beyond the intended events.
+   The script also queues `autoConfig: false` before initialization. Verify the
+   resulting network payloads; do not treat that single setting as a guarantee.
+3. Do not put names, emails, phone numbers, financial details or other sensitive
+   information in campaign URLs or Meta event parameters. Meta can receive a
+   page URL and network/browser information even when no form fields are passed.
+4. Review the active uses with the broker/privacy adviser, including California
+   sale/sharing duties, provider terms and the actual targeting geography.
+   Update `privacy.html`, `cookies.html`, and the visible status copy to describe
+   the enabled practice accurately before changing the flag.
+5. Keep rejection as easy as acceptance. Preserve stored opt-outs and GPC
+   enforcement. Do not reuse a past opt-in after materially changing the
+   disclosure. The current v2 preference key ignores v1 opt-ins; if changing
+   terms again, migrate existing rejections while requiring a fresh opt-in.
+6. After the preceding checks, change `metaPixelEnabled` to `true`. Do not add
+   an unconditional Pixel snippet, noscript image, or second tag-manager route.
 
-## Step 2: Add it to the site
+## Verify in a review deployment
 
-The current installed Dataset / Pixel ID is:
+- Fresh visitors send no requests to Meta before choosing **Allow tracking**.
+- **Keep tracking off**, the footer opt-out and GPC prevent measurement; the
+  opt-out remains after removing GPC and applies across open tabs.
+- If storage is blocked, failed persistence must not silently enable tracking.
+- Once explicitly allowed, inspect PageView and accepted-inquiry Lead events.
+  There must be no contact details, budget, message, sensitive URL data or
+  automatic form events in the payloads.
+- A direct visit, refresh or replay of the thank-you URL must not create another
+  lead conversion. Declining measurement must not prevent an inquiry.
+- Withdrawal stops future optional tracking; explain that it cannot undo data
+  previously received by Meta. Verify provider/account handling too.
 
-const CONFIG = {
-  metaPixelId: '2061494168135844'
-};
+Use only a clearly identified test inquiry approved for the intended delivery
+route. Unit tests use mocks and do not verify Meta settings or real delivery.
 
-If Meta gives you a different numeric Pixel ID later, replace 2061494168135844 with the new numeric Pixel ID.
+## Housing advertisements
 
-Example:
+Evan confirmed on October 20, 2026 that paid ads will target the United States
+only. Apply that geography in campaign settings; the website itself remains
+publicly accessible.
 
-const CONFIG = {
-  metaPixelId: '123456789012345'
-};
-
-## Step 3: Upload and test
-
-1. Upload the updated files to your host.
-2. Open the live website in a clean browser.
-3. Click Approve in the cookie banner.
-4. Use the Meta Pixel Helper Chrome extension or Events Manager Test Events to confirm PageView fires.
-5. Submit the contact form with test information and confirm the Lead event fires.
-
-## Step 4: Housing ads reminder
-
-Real estate related Meta ads usually need to be handled under Meta Special Ad Category rules for housing. Do not build audiences or ad copy in a way that excludes or targets protected classes. Have your broker review paid campaigns before launch.
-
-## Privacy reminder
-
-The Privacy Notice and Cookie Policy describe optional Meta Pixel tracking, but templates are not legal advice. Have privacy language reviewed before retargeting visitors.
+Declare Housing for these real-estate campaigns. Inspect current
+Ads Manager targeting, exclusions, placement and lead-form restrictions before
+launch. A website disclosure does not fix a discriminatory audience or a missing
+DRE disclosure in the creative. See `launch-checklist.md` for the full review and
+open business-side items.

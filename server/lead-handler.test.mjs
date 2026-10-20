@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleLead } from './lead-handler.mjs';
+import { handleLead, CONTACT_CONSENT_VERSION, CONTACT_CONSENT_TEXT } from './lead-handler.mjs';
 import worker from './worker.mjs';
 
 const valid = {
@@ -13,7 +13,7 @@ const valid = {
   timeline: '3–6 months',
   request_type: 'Home comparison',
   contact_consent: 'on',
-  consent_version: '2026-10-19',
+  consent_version: CONTACT_CONSENT_VERSION,
   submitted_at: '2026-10-19T12:00:00.000Z',
   landing_page: '/',
   referrer_origin: 'https://www.google.com',
@@ -69,6 +69,8 @@ test('valid lead maps to FUB events and preserves qualification, consent, and ca
   });
   assert.match(outgoing.payload.message, /Budget: \$700,000–\$1 million/);
   assert.match(outgoing.payload.message, /Contact consent: Yes — contact about this request/);
+  assert.ok(outgoing.payload.message.includes(`Consent text: ${CONTACT_CONSENT_TEXT}`));
+  assert.match(outgoing.payload.message, /Marketing permission: Not collected by this form/);
   assert.match(outgoing.payload.message, /Consent version: 2026-10-19/);
   assert.match(outgoing.payload.message, /CTA: hero/);
   assert.ok(!outgoing.init.body.includes(fakeKey));
@@ -103,6 +105,7 @@ test('accepts separate name fields, consent boolean, and existing-contact FUB 20
 test('invalid or missing qualification data never reaches FUB', async () => {
   const cases = [
     { name: '' }, { email: 'invalid' }, { interest: '' }, { contact_consent: false },
+    { consent_version: '' }, { consent_version: 'outdated' },
     { interest: 'unknown' }, { area: 'unlisted' }, { budget: 'unlisted' }, { timeline: 'unlisted' },
     { contact_method: 'text', phone: '' }, { contact_method: 'call', phone: '' },
     { phone: 'not-a-phone' }, { contact_method: 'fax' }, { request_type: 'other' },

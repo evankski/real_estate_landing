@@ -1,6 +1,8 @@
 const FUB_ENDPOINT = 'https://api.followupboss.com/v1/events';
 const MAX_BODY_BYTES = 16_384;
 const REQUEST_TIMEOUT_MS = 10_000;
+export const CONTACT_CONSENT_VERSION = '2026-10-19-inquiry-v2';
+export const CONTACT_CONSENT_TEXT = 'I ask Evan Karwowski with WR Properties to reply to this inquiry using my selected contact method. This is not consent to automated marketing calls, marketing texts, or an email newsletter.';
 const PUBLIC_ORIGINS = new Set([
   'https://evankrealestate.com',
   'https://www.evankrealestate.com'
@@ -110,6 +112,7 @@ function choice(data, field, required = false) {
 function normalizeLead(data) {
   if (text(data, '_honey', 200)) throw new InvalidInput();
   if (data.contact_consent !== true && data.contact_consent !== 'on') throw new InvalidInput();
+  if (text(data, 'consent_version', 40) !== CONTACT_CONSENT_VERSION) throw new InvalidInput();
   const suppliedName = text(data, 'fullName', 100) || text(data, 'name', 100);
   let firstName = text(data, 'firstName', 100);
   let lastName = text(data, 'lastName', 100);
@@ -179,6 +182,8 @@ function eventPayload(lead, system) {
     ['Town or listing', lead.areaOrListing],
     ['Message', lead.message],
     ['Contact consent', 'Yes — contact about this request'],
+    ['Consent text', CONTACT_CONSENT_TEXT],
+    ['Marketing permission', 'Not collected by this form. Do not enroll in automated marketing from this inquiry alone.'],
     ['Consent version', lead.consentVersion],
     ['Submitted at (browser)', lead.submittedAt],
     ['Received at (server)', new Date().toISOString()],

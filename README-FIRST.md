@@ -41,7 +41,8 @@ and cannot be served by the preview server or copied into the public build.
 ## Follow Up Boss integration
 
 The browser submits JSON to `/api/leads`. The server validates the name, email,
-interest, contact permission, allowed selections, field lengths, and honeypot.
+interest, contact permission and its current text version, allowed selections,
+field lengths, and honeypot.
 A phone number is required when the visitor chooses a call or text. It then
 sends a `General Inquiry` to `POST https://api.followupboss.com/v1/events` using
 HTTP Basic authentication with the API key as username and an empty password.
@@ -50,6 +51,9 @@ Name, email, and phone map to the contact. The inquiry message records the
 requested service, area, budget, timeline, preferred contact method, listing
 link or question, consent version, received time, and campaign context.
 It does not infer income, lending eligibility, or marketing consent.
+The current inquiry-only consent wording is recorded with the inquiry. FUB
+automation settings must be reviewed separately: a note stating that marketing
+permission was not collected does not prevent an existing action plan from running.
 UTM source, medium, campaign, term, and content map to the FUB campaign object
 when a UTM source is present; partial attribution stays in the message.
 The lead source is `evankrealestate.com`.
@@ -71,7 +75,10 @@ The existing FormSubmit email route to `evan@thewowski.com` remains a fallback
 when the endpoint is absent, rejects POST as unsupported, or explicitly reports
 `NOT_CONFIGURED`. Once the API
 is configured, leads use FUB. FUB's Lead Flow controls assignment and any follow-up
-actions; review its source configuration before turning on automated follow-up.
+actions; review existing action plans and source configuration before activating
+API delivery. As of October 20, 2026, Evan has not decided whether to use
+automated follow-up or call recording, and no FUB account settings have been
+inspected or changed as part of this website work.
 The server does not silently switch to another provider after an ambiguous
 network failure or a FUB delivery error.
 
@@ -154,9 +161,16 @@ Brokerage attribution is WR Properties / Winning Results Realty, Inc.,
 CA DRE #02029047. Evan's CA DRE number is 02102429.
 Update the sitemap and canonical URLs if the domain changes.
 
-The browser remembers optional tracking choices and honors Global Privacy
-Control as an opt-out. The footer's Cookie Settings control reopens the choice.
-Use an incognito session to check the first-visit behavior.
+Meta Pixel is paused by default (`metaPixelEnabled: false` in `script.js`).
+The browser preserves opt-outs, honors Global Privacy Control persistently,
+and does not reuse legacy opt-ins. Footer controls show the current status.
+See `facebook-pixel-setup.md` before enabling measurement; update the policy
+wording and verify account settings as part of that change.
+
+The October 19, 2026 review, completed fixes, sources, and open business-side
+checks are in `launch-checklist.md`. The review is not legal certification.
+Privacy-request handling, retention settings, communications consent, brokerage
+approval, and live deployment still require the listed operational checks.
 
 ## Design and future ad pages
 

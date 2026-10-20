@@ -2,6 +2,9 @@
   document.documentElement.classList.add('js');
 
   const CONFIG = {
+    // Enable only after the Meta settings and launch checks in
+    // launch-checklist.md are complete. Visitor permission is still required.
+    metaPixelEnabled: false,
     metaPixelId: '2061494168135844'
   };
 
@@ -59,7 +62,8 @@
   const cookieSettingsButton = document.getElementById('cookieSettingsButton');
   const doNotSellButton = document.getElementById('doNotSellButton');
   const cookieChoiceField = document.getElementById('cookieChoiceField');
-  const consentKey = 'ek_cookie_tracking_choice';
+  const privacyStatus = document.getElementById('privacyStatus');
+  const consentKey = 'ek_cookie_tracking_choice_v2';
   const leadReceiptKey = 'ek_lead_receipt';
   let cookieReturnFocus = null;
   let confirmedLead = false;
@@ -92,7 +96,12 @@
 
   function getStoredChoice() {
     try {
-      return window.localStorage ? window.localStorage.getItem(consentKey) : null;
+      if (!window.localStorage) return null;
+      const choice = window.localStorage.getItem(consentKey);
+      if (choice === 'accepted' || choice === 'rejected') return choice;
+      // Keep past opt-outs. A prior opt-in does not authorize the revised
+      // measurement disclosure.
+      return window.localStorage.getItem('ek_cookie_tracking_choice') === 'rejected' ? 'rejected' : null;
     } catch (error) {
       return null;
     }
@@ -108,6 +117,16 @@
 
   function updateCookieField(choice) {
     if (cookieChoiceField) cookieChoiceField.value = choice || 'not selected';
+    if (privacyStatus) {
+      privacyStatus.textContent = choice === 'rejected'
+        ? 'Opt-out request honored for this browser. Optional advertising tracking is off.'
+        : !CONFIG.metaPixelEnabled
+          ? 'Optional advertising measurement is currently paused.'
+          : choice === 'accepted'
+            ? 'Optional advertising tracking is allowed in this browser. You can change it in Cookie settings.'
+            : 'Optional advertising tracking is off until you allow it.';
+    }
+    if (doNotSellButton) doNotSellButton.setAttribute('aria-pressed', String(choice === 'rejected'));
   }
 
   function browserSendsOptOutSignal() {
@@ -125,14 +144,22 @@
     if (!cookieBanner) return;
     if (acceptCookies) {
       const optOutIsActive = browserSendsOptOutSignal();
-      acceptCookies.disabled = optOutIsActive;
-      acceptCookies.textContent = optOutIsActive ? 'Browser opt-out is on' : 'Allow tracking';
+      acceptCookies.disabled = optOutIsActive || !CONFIG.metaPixelEnabled;
+      acceptCookies.textContent = optOutIsActive ? 'Browser opt-out is on'
+        : !CONFIG.metaPixelEnabled ? 'Measurement is paused' : 'Allow tracking';
     }
+    const bannerText = document.getElementById('cookieBannerText');
+    if (bannerText) bannerText.textContent = CONFIG.metaPixelEnabled
+      ? 'Allow Meta to receive page visits and successful inquiry events for advertising measurement? Your choice is optional. You can browse and contact Evan with tracking off.'
+      : 'Meta advertising measurement is currently paused. No Meta Pixel script or events are loaded. You can keep tracking off and review the privacy notice below.';
     cookieBanner.hidden = false;
     cookieBanner.removeAttribute('hidden');
     cookieBanner.setAttribute('aria-hidden', 'false');
     document.body.classList.add('has-cookie-banner');
-    if (moveFocus && rejectCookies) rejectCookies.focus({ preventScroll: true });
+    if (moveFocus && rejectCookies) {
+      cookieBanner.scrollIntoView({ block: 'center', behavior: 'auto' });
+      rejectCookies.focus({ preventScroll: true });
+    }
   }
 
   function pixelIdIsReady(pixelId) {
@@ -148,7 +175,7 @@
   }
 
   function loadMetaPixel(pixelId) {
-    if (!pixelIdIsReady(pixelId)) return;
+    if (!CONFIG.metaPixelEnabled || browserSendsOptOutSignal() || !pixelIdIsReady(pixelId)) return;
 
     if (window.fbq) {
       grantMetaPixelConsent();
@@ -171,12 +198,13 @@
     firstScript.parentNode.insertBefore(script, firstScript);
 
     grantMetaPixelConsent();
+    window.fbq('set', 'autoConfig', false, pixelId);
     window.fbq('init', pixelId);
     window.fbq('track', 'PageView');
   }
 
   function trackConfirmedLead() {
-    if (!confirmedLead || leadTracked || browserSendsOptOutSignal() || getStoredChoice() !== 'accepted') return;
+    if (!CONFIG.metaPixelEnabled || !confirmedLead || leadTracked || browserSendsOptOutSignal() || getStoredChoice() !== 'accepted') return;
     try {
       loadMetaPixel(CONFIG.metaPixelId);
       if (window.fbq) {
@@ -189,6 +217,7 @@
   }
 
   function setTrackingChoice(choice) {
+    if (choice === 'accepted' && !CONFIG.metaPixelEnabled) return;
     const enforcedChoice = choice === 'accepted' && browserSendsOptOutSignal() ? 'rejected' : choice;
     saveStoredChoice(enforcedChoice);
     updateCookieField(enforcedChoice);
@@ -214,9 +243,12 @@
   const existingChoice = getStoredChoice();
   const browserChoice = browserSendsOptOutSignal() ? 'rejected' : null;
   const effectiveChoice = browserChoice || existingChoice;
+  if (browserChoice) saveStoredChoice('rejected');
 
   updateCookieField(effectiveChoice);
-  if (effectiveChoice === 'accepted') {
+  if (!CONFIG.metaPixelEnabled) {
+    hideCookieBanner();
+  } else if (effectiveChoice === 'accepted') {
     loadMetaPixel(CONFIG.metaPixelId);
     hideCookieBanner();
   } else if (effectiveChoice === 'rejected') {
@@ -234,6 +266,18 @@
     });
   }
   if (doNotSellButton) doNotSellButton.addEventListener('click', () => setTrackingChoice('rejected'));
+
+  // Apply a choice changed in another open tab without waiting for a reload.
+  window.addEventListener('storage', (event) => {
+    if (event.key !== consentKey && event.key !== null) return;
+    const choice = browserSendsOptOutSignal() ? 'rejected' : getStoredChoice();
+    updateCookieField(choice);
+    if (choice !== 'accepted' && window.fbq) window.fbq('consent', 'revoke');
+    if (choice === 'accepted') {
+      loadMetaPixel(CONFIG.metaPixelId);
+      trackConfirmedLead();
+    }
+  });
 
   trackConfirmedLead();
 
@@ -357,7 +401,7 @@
         // Ignore malformed or unavailable referrers.
       }
       hiddenValue('referrer_origin', referrerOrigin.slice(0, 200));
-      hiddenValue('consent_version', '2026-10-19');
+      hiddenValue('consent_version', '2026-10-19-inquiry-v2');
     }
 
     function selectArea(area) {
