@@ -217,6 +217,148 @@ test('partial campaign is recorded without inventing its required source', async
   assert.match(payload.message, /Campaign campaign: local-homes/);
 });
 
+test('campaign requests preserve their specific preferences without requiring a phone or marketing permission', async () => {
+  const requests = [
+    {
+      campaign_id: 'C1', request_type: 'Home comparison', area: 'Oakley',
+      priority_one: 'A place to work from home', priority_two: 'Trail access',
+      area_or_listing: 'https://example.test/listing',
+      expected: ['Offer: C1', 'Area: Oakley', 'First priority: A place to work from home', 'Second priority: Trail access']
+    },
+    {
+      campaign_id: 'C2', request_type: 'Buyer readiness plan',
+      readiness_question: 'Financing conversation', personalized_outline: 'on',
+      completed_steps: 'Compared monthly costs.\nNeed to choose the next step.',
+      expected: ['Readiness question: Financing conversation', 'Personalized outline requested: Yes — an additional service request, not marketing permission', 'Steps already completed: Compared monthly costs.']
+    },
+    {
+      campaign_id: 'C3', request_type: 'Seller pricing and preparation', interest: 'Selling a home',
+      property_address: '123 Example Lane, Brentwood', property_notes: 'Roof condition needs checking.',
+      expected: ['Property address: 123 Example Lane, Brentwood', 'Property notes: Roof condition needs checking.']
+    },
+    {
+      campaign_id: 'C4', request_type: 'Open-house details', property_slug: 'example-property',
+      expected: ['Request: Open-house details', 'Property reference: example-property']
+    }
+  ];
+  for (const { expected, ...fields } of requests) {
+    let payload;
+    const result = await handleLead(request({ ...valid, ...fields }), {
+      FUB_API_KEY: fakeKey,
+      fetch: async (_, init) => {
+        payload = JSON.parse(init.body);
+        return new Response('{}', { status: 201 });
+      }
+    });
+    assert.equal(result.status, 200, fields.campaign_id);
+    assert.equal(payload.person.phones, undefined);
+    assert.equal(payload.source, 'evankrealestate.com');
+    assert.equal(payload.campaign, undefined, 'offer identity is not an invented ad source');
+    for (const detail of expected) assert.ok(payload.message.includes(detail), detail);
+    assert.ok(payload.message.includes(CONTACT_CONSENT_TEXT));
+    assert.match(payload.message, /Marketing permission: Not collected by this form/);
+  }
+});
+
+test('comparison requests accept separate saved listing links and preserve their line breaks', async () => {
+  const links = 'https://example.test/home-one\r\nhttps://example.test/home-two\nhttps://example.test/home-three';
+  let payload;
+  const result = await handleLead(request({
+    ...valid, campaign_id: 'C1', area: 'Oakley', priority_one: 'Home office',
+    area_or_listing: links
+  }), {
+    FUB_API_KEY: fakeKey,
+    fetch: async (_, init) => {
+      payload = JSON.parse(init.body);
+      return new Response('{}', { status: 201 });
+    }
+  });
+  assert.equal(result.status, 200);
+  assert.ok(payload.message.includes(`Town or listing: ${links.replace(/\r\n/g, '\n')}`));
+  assert.equal(payload.person.phones, undefined);
+});
+
+test('a checklist-copy-only request is accepted without a personalized outline or phone', async () => {
+  let payload;
+  const result = await handleLead(request({
+    name: 'Jamie Buyer', email: 'jamie@example.test', campaign_id: 'C2',
+    interest: 'Buying a home', request_type: 'Buyer readiness plan',
+    contact_method: 'email', area: 'Oakley', readiness_question: 'Not sure yet',
+    contact_consent: 'on', consent_version: CONTACT_CONSENT_VERSION
+  }), {
+    FUB_API_KEY: fakeKey,
+    fetch: async (_, init) => {
+      payload = JSON.parse(init.body);
+      return new Response('{}', { status: 201 });
+    }
+  });
+  assert.equal(result.status, 200);
+  assert.equal(payload.person.phones, undefined);
+  assert.match(payload.message, /Personalized outline requested: No — checklist copy only/);
+  assert.match(payload.message, /Marketing permission: Not collected by this form/);
+  assert.ok(!payload.message.includes('Personalized outline requested: Yes'));
+});
+
+test('manual scheduling records a time request, never a booked appointment', async () => {
+  for (const [campaignId, requestType] of [
+    ['C1', 'Buyer planning call'], ['C2', 'Buyer planning call'], ['C3', 'Seller planning conversation']
+  ]) {
+    let payload;
+    const response = await handleLead(request({
+      ...valid, campaign_id: campaignId, request_type: requestType,
+      preferred_time_one: 'Tuesday afternoon', preferred_time_two: 'Thursday morning',
+      timezone: 'America/Los_Angeles', meeting_format: 'Video'
+    }), {
+      FUB_API_KEY: fakeKey,
+      fetch: async (_, init) => {
+        payload = JSON.parse(init.body);
+        return new Response('{}', { status: 201 });
+      }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(payload.type, 'General Inquiry');
+    assert.equal(payload.person.phones, undefined);
+    assert.match(payload.message, /First proposed time: Tuesday afternoon/);
+    assert.match(payload.message, /Alternative proposed time: Thursday morning/);
+    assert.match(payload.message, /Time zone: America\/Los_Angeles/);
+    assert.match(payload.message, /Meeting format requested: Video/);
+    assert.match(payload.message, /Time request only — no appointment has been booked or confirmed/);
+  }
+});
+
+test('invalid campaign identities, incompatible offers, and unbounded preferences never reach FUB', async () => {
+  const scheduling = {
+    campaign_id: 'C1', request_type: 'Buyer planning call',
+    preferred_time_one: 'Tuesday afternoon', timezone: 'America/Los_Angeles', meeting_format: 'Video'
+  };
+  const cases = [
+    { campaign_id: 'C9' },
+    { campaign_id: 'C1', request_type: 'Buyer readiness plan' },
+    { campaign_id: 'C2', request_type: 'Home comparison' },
+    { campaign_id: 'C3', request_type: 'Consultation' },
+    { campaign_id: 'C4', request_type: 'Buyer planning call' },
+    { request_type: 'Seller pricing and preparation' },
+    { campaign_id: 'C3', request_type: 'Seller pricing and preparation', property_address: '' },
+    { ...scheduling, preferred_time_one: '' }, { ...scheduling, timezone: '' },
+    { ...scheduling, meeting_format: '' }, { ...scheduling, meeting_format: 'Phone', phone: '' },
+    { meeting_format: 'Unlisted' }, { readiness_question: 'Income' },
+    { personalized_outline: 'yes' }, { personalized_outline: [] },
+    { priority_one: 'a'.repeat(301) }, { priority_two: 'b'.repeat(301) },
+    { completed_steps: 'a'.repeat(1501) }, { property_address: 'a'.repeat(501) },
+    { property_notes: 'a'.repeat(2001) }, { preferred_time_one: 'a'.repeat(201) },
+    { preferred_time_two: 'a'.repeat(201) }, { timezone: 'a'.repeat(101) },
+    { property_slug: '../private' }, { property_slug: 'a'.repeat(101) }
+  ];
+  for (const changes of cases) {
+    let called = false;
+    const result = await handleLead(request({ ...valid, ...changes }), {
+      FUB_API_KEY: fakeKey, fetch: async () => { called = true; throw new Error('must not run'); }
+    });
+    assert.equal(result.status, 400, JSON.stringify(changes));
+    assert.equal(called, false);
+  }
+});
+
 test('worker routes leads to handler and other requests to its assets binding', async () => {
   const assetRequests = [];
   const env = { ASSETS: { fetch: async (assetRequest) => { assetRequests.push(assetRequest); return new Response('asset'); } } };

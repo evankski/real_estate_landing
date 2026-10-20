@@ -76,8 +76,11 @@
       const receipt = JSON.parse(window.sessionStorage.getItem(leadReceiptKey) || 'null');
       window.sessionStorage.removeItem(leadReceiptKey);
       const age = receipt ? Date.now() - receipt.acceptedAt : -1;
+      const pageCampaigns = (document.body.dataset.campaignId || '').trim().split(/\s+/);
       confirmedLead = new URLSearchParams(window.location.search).get('submitted') === '1'
         && receipt?.status === 'accepted'
+        && receipt.thanksPath === window.location.pathname
+        && pageCampaigns.includes(receipt.campaignId)
         && age >= 0
         && age < 10 * 60 * 1000;
     } catch (error) {
@@ -87,9 +90,10 @@
     if (confirmedLead) {
       const thanksTitle = document.getElementById('thanksTitle');
       const thanksMessage = document.getElementById('thanksMessage');
-      if (thanksTitle) thanksTitle.textContent = 'Your inquiry is on its way.';
+      if (thanksTitle) thanksTitle.textContent = document.body.dataset.confirmedTitle || 'Your inquiry is on its way.';
       if (thanksMessage) {
-        thanksMessage.textContent = 'Thanks for reaching out. Evan will review the details and get back to you using your preferred contact method. He usually replies within an hour during the day.';
+        thanksMessage.textContent = document.body.dataset.confirmedMessage
+          || 'Thanks for reaching out. Evan will review the details and get back to you using your preferred contact method. He usually replies within an hour during the day.';
       }
     }
   }
@@ -321,6 +325,8 @@
     const areaSelect = document.getElementById('areaSelect');
     const contactMethod = document.getElementById('contactMethod');
     const phone = form.elements.namedItem('phone');
+    const meetingFormat = form.elements.namedItem('meeting_format');
+    const campaignId = form.elements.namedItem('campaign_id')?.value || '';
     const query = new URLSearchParams(window.location.search);
     const intentValues = {
       buy: 'Buying a home',
@@ -349,8 +355,9 @@
       steps.forEach((step, stepIndex) => {
         step.hidden = stepIndex !== currentStep;
       });
-      if (stepStatus) stepStatus.textContent = `Step ${index + 1} of ${steps.length} · ${index === 0 ? 'Your plans' : 'Your details'}`;
-      if (nextButton) nextButton.hidden = index !== 0;
+      const stepLabel = steps[index]?.dataset.stepLabel || (index === 0 ? 'Your plans' : 'Your details');
+      if (stepStatus) stepStatus.textContent = `Step ${index + 1} of ${steps.length} · ${stepLabel}`;
+      if (nextButton) nextButton.hidden = index >= steps.length - 1;
       if (backButton) backButton.hidden = index === 0;
       if (button) button.hidden = steps.length > 1 && index < steps.length - 1;
       form.dataset.currentStep = String(index + 1);
@@ -362,8 +369,9 @@
     }
 
     function updatePhoneRequirement() {
-      if (!phone || !contactMethod) return;
-      phone.required = contactMethod.value === 'text' || contactMethod.value === 'call';
+      if (!phone) return;
+      phone.required = contactMethod?.value === 'text' || contactMethod?.value === 'call'
+        || meetingFormat?.value === 'Phone';
       phone.setAttribute('aria-required', String(phone.required));
       const hint = document.getElementById('phoneHint');
       if (hint) hint.textContent = phone.required ? 'Required so Evan can reach you this way.' : 'Optional if you prefer email.';
@@ -425,8 +433,11 @@
     }
 
     function selectIntent(intent, request) {
+      // Campaign forms advertise one fixed service. A query parameter or a
+      // general-purpose CTA must not silently turn it into another request.
+      if (campaignId) return;
       const value = intentValues[intent] || intent;
-      const inputs = form.querySelectorAll('input[name="interest"]');
+      const inputs = form.querySelectorAll('input[name="interest"][type="radio"]');
       inputs.forEach((input) => { input.checked = input.value === value; });
       // Retain support for an older campaign page using a select.
       const interestSelect = document.getElementById('interestSelect');
@@ -451,19 +462,30 @@
 
     function acceptSubmission() {
       submissionSucceeded = true;
+      const destination = new URL(form.dataset.thanksPath || './thanks.html', window.location.href);
+      // Only a local, plain path may be used as a confirmation destination.
+      const configuredPathIsSafe = destination.origin === window.location.origin
+        && ['http:', 'https:'].includes(destination.protocol)
+        && !destination.search && !destination.hash;
+      const thanksUrl = configuredPathIsSafe ? destination : new URL('./thanks.html', window.location.href);
+      thanksUrl.searchParams.set('submitted', '1');
       // Only a service-accepted response can create this short-lived receipt.
-      // No contact details or campaign information are stored in the browser.
+      // Only the destination and fixed offer ID accompany its timestamp; no
+      // contact details, preferences, or advertising attribution are stored.
       try {
         window.sessionStorage.setItem(leadReceiptKey, JSON.stringify({
           status: 'accepted',
-          acceptedAt: Date.now()
+          acceptedAt: Date.now(),
+          thanksPath: thanksUrl.pathname,
+          campaignId
         }));
-        window.location.assign(new URL('./thanks.html?submitted=1', window.location.href).href);
+        window.location.assign(thanksUrl.href);
       } catch (error) {
         // Private browsing may block storage. Keep a useful confirmation here.
         confirmedLead = true;
         trackConfirmedLead();
-        setStatus('Your inquiry is on its way. Evan will get back to you using your preferred contact method.', 'success');
+        setStatus(form.dataset.successMessage
+          || 'Your inquiry is on its way. Evan will get back to you using your preferred contact method.', 'success');
         resetFormSubmitState();
       }
     }
@@ -500,16 +522,17 @@
     captureAttribution();
     updatePhoneRequirement();
     if (contactMethod) contactMethod.addEventListener('change', updatePhoneRequirement);
-    form.querySelectorAll('input[name="interest"]').forEach((input) => {
+    if (meetingFormat) meetingFormat.addEventListener('change', updatePhoneRequirement);
+    form.querySelectorAll('input[name="interest"][type="radio"]').forEach((input) => {
       input.addEventListener('change', () => {
         const intent = Object.keys(intentValues).find((key) => intentValues[key] === input.value);
         selectIntent(intent || input.value);
       });
     });
-    document.querySelectorAll('[data-interest]').forEach((cta) => {
+    document.querySelectorAll('[data-interest], [data-cta-source], [data-source]').forEach((cta) => {
       cta.addEventListener('click', () => {
         if (isSubmitting || submissionSucceeded) return;
-        selectIntent(cta.dataset.interest || 'explore', cta.dataset.request);
+        if (cta.dataset.interest) selectIntent(cta.dataset.interest, cta.dataset.request);
         selectArea(cta.dataset.area);
         if (ctaSource) ctaSource.value = (cta.dataset.ctaSource || cta.dataset.source || cta.id || cta.textContent.trim()).slice(0, 120);
         if (steps.length > 1) setStep(0, false);
@@ -517,7 +540,7 @@
       });
     });
     const pageIntent = query.get('intent') || document.body.dataset.pageIntent;
-    if (pageIntent && intentValues[pageIntent]) {
+    if (!campaignId && pageIntent && intentValues[pageIntent]) {
       selectIntent(pageIntent);
       if (ctaSource) ctaSource.value = query.has('intent') ? 'Campaign URL' : 'Campaign page';
     }
@@ -549,8 +572,8 @@
       event.preventDefault();
       if (isSubmitting || submissionSucceeded) return;
       updatePhoneRequirement();
-      if (steps.length > 1 && currentStep === 0) {
-        if (validate(steps[0])) setStep(1, true);
+      if (steps.length > 1 && currentStep < steps.length - 1) {
+        if (validate(steps[currentStep])) setStep(currentStep + 1, true);
         return;
       }
       const invalidStep = steps.findIndex((step) =>

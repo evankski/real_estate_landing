@@ -7,7 +7,16 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "none",
-    "run_worker_first": ["/", "/api/leads"]
+    "run_worker_first": [
+      "/", "/api/leads",
+      "/compare", "/compare/*",
+      "/buyer-plan", "/buyer-plan/*",
+      "/seller-plan", "/seller-plan/*",
+      "/open-house", "/open-house/*",
+      "/thanks/*", "/book/*",
+      "/preferences", "/preferences/*",
+      "/resources/*"
+    ]
   },
   "vars": {
     "FUB_SYSTEM": "EvanKarwowskiWebsite"

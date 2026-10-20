@@ -7,8 +7,17 @@ qualified inquiries to Follow Up Boss. There are no application dependencies.
 
 The website still runs on GitHub Pages as ordinary HTML, CSS, and JavaScript.
 No Node server, npm command, or compilation is needed to display the published
-pages. `npm run dev` is an optional local preview server; `npm run build` only
-copies the public files into `dist/` for deployment tools that need that folder.
+pages. `npm run dev` is an optional local preview server. `npm run build`
+regenerates the campaign HTML from its shared copy/template and copies the public
+files into `dist/` for deployment tools that need that folder. The generated HTML
+is also saved in the repository, so GitHub Pages can serve it directly.
+
+The campaign pages, video slots, and manual scheduling setup are documented in
+[CAMPAIGN-PAGES.md](CAMPAIGN-PAGES.md). Edit `scripts/campaign-config.mjs` for offer
+copy and future videos; edit `scripts/generate-campaigns.mjs` for shared markup.
+Run `npm run build` after those edits and include the regenerated HTML in your
+next commit. `campaigns.css` and `campaigns.js` supply the shared presentation
+and optional browser enhancements.
 
 GitHub Pages cannot run the FUB API endpoint. On a static host, an absent endpoint
 (404) or unsupported POST (405) sends the form through the existing FormSubmit
@@ -18,8 +27,8 @@ the API key private. The included Cloudflare Worker can handle that endpoint
 and the website; moving the static website is not a requirement for using FUB,
 but a separate endpoint would need its URL and origin settings connected.
 
-Opening `index.html` directly is sufficient to view the design. Use an HTTP
-preview or the published website to check form submissions.
+Use an HTTP preview or the published website to view the full site and check
+form behavior. Campaign pages use root-relative URLs for their shared assets.
 
 ## Preview locally
 

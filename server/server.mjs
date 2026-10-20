@@ -1,45 +1,29 @@
 import { createServer } from 'node:http';
-import { readFile, lstat, realpath } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
-import { dirname, resolve, sep } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { handleLead } from './lead-handler.mjs';
-import { isPublicPath } from './public-files.mjs';
+import { resolvePublicFile } from './public-files.mjs';
+import { publicPathFromUrl } from './public-paths.mjs';
+export { publicPathFromUrl } from './public-paths.mjs';
 
 export const SITE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
-  '.jpg': 'image/jpeg', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
+  '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.vtt': 'text/vtt; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
-
-export function publicPathFromUrl(rawUrl) {
-  try {
-    if (!rawUrl.startsWith('/') || rawUrl.startsWith('//')) return null;
-    const path = decodeURIComponent(rawUrl.split('?')[0]);
-    if (path.includes('\\') || path.includes('\0') || path.split('/').some(part => part === '..' || part === '.')) return null;
-    const relativePath = path === '/' ? 'index.html' : path.slice(1);
-    return isPublicPath(relativePath) ? relativePath : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function serveAsset(rawUrl, method = 'GET', root = SITE_ROOT) {
   if (!['GET', 'HEAD'].includes(method)) return new Response('Method not allowed', { status: 405 });
   const relativePath = publicPathFromUrl(rawUrl);
   if (!relativePath) return new Response('Not found', { status: 404 });
   try {
-    const rootPath = await realpath(root);
-    const filename = resolve(rootPath, relativePath);
-    const resolvedFilename = await realpath(filename);
-    const info = await lstat(filename);
-    if (!info.isFile() || info.isSymbolicLink() || !resolvedFilename.startsWith(rootPath + sep)) {
-      return new Response('Not found', { status: 404 });
-    }
-    if (relativePath.startsWith('areas/') && (await lstat(resolve(rootPath, 'areas'))).isSymbolicLink()) {
-      return new Response('Not found', { status: 404 });
-    }
+    const filename = await resolvePublicFile(root, relativePath);
+    if (!filename) return new Response('Not found', { status: 404 });
     const extension = relativePath.slice(relativePath.lastIndexOf('.'));
     return new Response(method === 'HEAD' ? null : await readFile(filename), {
       headers: {

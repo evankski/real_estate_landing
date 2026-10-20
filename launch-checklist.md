@@ -28,6 +28,17 @@ lawful targeting, consent, service delivery, or data handling.
 
 ## Changes completed in the local source
 
+Campaign expansion on October 20 adds three offer pages, their confirmation and
+manual scheduling pages, a public printable buyer checklist, a communication
+preferences page, and an open-house hub/template. Evan confirmed the advertised
+two-business-day delivery commitment after receiving the necessary details.
+There is no booking-provider link yet: scheduling forms request preferred times
+and require Evan's personal confirmation. Checklist email copies and
+personalized work are fulfilled personally, not by a newly added autoresponder.
+Videos and the authorized property/event details remain unconfigured. See
+`CAMPAIGN-PAGES.md` for routes and activation instructions. These additions do
+not activate ads, pixels, FUB marketing rules, call recording, or a calendar.
+
 - Verified agent DRE 02102429 and responsible broker Winning Results Realty,
   Inc., DRE 02029047, doing business as WR Properties. Preserved that identity
   across all 19 pages; increased mobile header disclosures to 12px. Kept only

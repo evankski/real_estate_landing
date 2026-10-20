@@ -46,7 +46,7 @@ function element(textContent = '') {
 function openPage({
   choice, gpc = false, thanks = false, search, receipt,
   measurementEnabled = false,
-  href = 'https://www.evankrealestate.com/', links = [],
+  href, links = [], campaignId = '', confirmedTitle, confirmedMessage,
   localStorage = storage(choice ? { [CHOICE_KEY]: choice } : {}),
   sessionStorage = storage(receipt === undefined ? {} : {
     [RECEIPT_KEY]: typeof receipt === 'string' ? receipt : JSON.stringify(receipt)
@@ -66,6 +66,9 @@ function openPage({
   const firstScript = { parentNode: { insertBefore(script) { injectedScripts.push(script); } } };
   const body = element();
   if (thanks) body.dataset.leadSuccess = 'true';
+  body.dataset.campaignId = campaignId;
+  if (confirmedTitle) body.dataset.confirmedTitle = confirmedTitle;
+  if (confirmedMessage) body.dataset.confirmedMessage = confirmedMessage;
   const document = {
     body,
     documentElement: element(),
@@ -77,7 +80,7 @@ function openPage({
     contains(node) { return Object.values(ids).includes(node); }
   };
   const navigator = { globalPrivacyControl: gpc };
-  const location = new URL(href);
+  const location = new URL(href || (thanks ? 'https://www.evankrealestate.com/thanks.html' : 'https://www.evankrealestate.com/'));
   if (search !== undefined) location.search = search;
   const windowListeners = new Map();
   const window = {
@@ -123,7 +126,7 @@ test('production keeps measurement paused even when an allow handler is invoked'
 test('production sends no pixel or Lead for a confirmed receipt and stored acceptance', () => {
   const page = openPage({
     choice: 'accepted', thanks: true, search: '?submitted=1',
-    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.window.fbq, undefined);
@@ -241,7 +244,7 @@ test('unrelated storage events cannot change privacy state', () => {
 test('GPC overrides a stored acceptance and cannot be overridden by an allow action', () => {
   const page = openPage({
     measurementEnabled: true, choice: 'accepted', gpc: true, thanks: true, search: '?submitted=1',
-    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.leadCount(), 0);
@@ -280,7 +283,7 @@ test('visiting the thank-you URL directly never records a lead or confirms deliv
 test('a recent accepted receipt records one lead, is consumed, and cannot replay', () => {
   const page = openPage({
     measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
-    receipt: { status: 'accepted', acceptedAt: NOW - 9 * 60 * 1000 }
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 9 * 60 * 1000 }
   });
   assert.equal(page.leadCount(), 1);
   assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
@@ -299,7 +302,7 @@ test('a recent accepted receipt records one lead, is consumed, and cannot replay
 test('an accepted receipt waits for tracking consent and still records only once', () => {
   const page = openPage({
     measurementEnabled: true, thanks: true, search: '?submitted=1',
-    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.injectedScripts.length, 0);
   assert.equal(page.leadCount(), 0);
@@ -318,7 +321,10 @@ for (const [reason, receipt] of [
   ['invalid JSON', '{not valid JSON']
 ]) {
   test(`${reason} receipts never record a lead or confirm delivery`, () => {
-    const page = openPage({ measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1', receipt });
+    const page = openPage({
+      measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
+      receipt: typeof receipt === 'string' ? receipt : { thanksPath: '/thanks.html', campaignId: '', ...receipt }
+    });
     assert.equal(page.leadCount(), 0);
     assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
   });
@@ -327,10 +333,60 @@ for (const [reason, receipt] of [
 test('a receipt without the expected redirect flag does not record a lead', () => {
   const page = openPage({
     measurementEnabled: true, choice: 'accepted', thanks: true,
-    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+    receipt: { status: 'accepted', thanksPath: '/thanks.html', campaignId: '', acceptedAt: NOW - 1000 }
   });
   assert.equal(page.leadCount(), 0);
   assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+});
+
+test('campaign confirmation uses the accepted destination and fixed offer, with page-specific copy', () => {
+  const page = openPage({
+    choice: 'accepted', thanks: true, search: '?submitted=1',
+    href: 'https://www.evankrealestate.com/thanks/compare/', campaignId: 'C1',
+    confirmedTitle: 'Your comparison request is on its way.',
+    confirmedMessage: 'Evan will review your preferences.',
+    receipt: {
+      status: 'accepted', acceptedAt: NOW - 1000,
+      thanksPath: '/thanks/compare/', campaignId: 'C1'
+    }
+  });
+  assert.equal(page.ids.thanksTitle.textContent, 'Your comparison request is on its way.');
+  assert.equal(page.ids.thanksMessage.textContent, 'Evan will review your preferences.');
+  assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
+  assert.equal(page.injectedScripts.length, 0);
+});
+
+for (const [reason, receipt] of [
+  ['another campaign', { thanksPath: '/thanks/compare/', campaignId: 'C2' }],
+  ['another confirmation route', { thanksPath: '/thanks/buyer-plan/', campaignId: 'C1' }],
+  ['an older unbound receipt', {}]
+]) {
+  test(`campaign confirmation rejects ${reason}`, () => {
+    const page = openPage({
+      measurementEnabled: true, choice: 'accepted', thanks: true, search: '?submitted=1',
+      href: 'https://www.evankrealestate.com/thanks/compare/', campaignId: 'C1',
+      receipt: { status: 'accepted', acceptedAt: NOW - 1000, ...receipt }
+    });
+    assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+    assert.equal(page.leadCount(), 0);
+    assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
+  });
+}
+
+test('shared scheduling confirmation accepts only its declared campaigns and exact route', () => {
+  for (const campaignId of ['C1', 'C2', 'C3', 'C4', '']) {
+    const page = openPage({
+      thanks: true, search: '?submitted=1',
+      href: 'https://www.evankrealestate.com/thanks/booking/', campaignId: 'C1 C2 C3',
+      confirmedTitle: 'Your time request is on its way.',
+      receipt: {
+        status: 'accepted', acceptedAt: NOW - 1000,
+        thanksPath: '/thanks/booking/', campaignId
+      }
+    });
+    assert.equal(page.ids.thanksTitle.textContent,
+      ['C1', 'C2', 'C3'].includes(campaignId) ? 'Your time request is on its way.' : NEUTRAL_TITLE);
+  }
 });
 
 test('same-origin links carry only allowlisted campaign fields, each bounded to 200 characters', () => {

@@ -10,12 +10,27 @@ const PUBLIC_ORIGINS = new Set([
 
 export const LEAD_OPTIONS = Object.freeze({
   interest: ['Buying a home', 'Selling a home', 'Buying and selling', 'Exploring my options'],
-  area: ['Brentwood', 'Livermore', 'Pleasanton', 'Discovery Bay', 'More than one area', 'Somewhere else'],
+  area: ['Brentwood', 'Oakley', 'Livermore', 'Pleasanton', 'Discovery Bay', 'More than one area', 'Somewhere else'],
   budget: ['Under $700,000', '$700,000–$1 million', '$1–$1.5 million', '$1.5–$2 million', '$2 million+', 'Still deciding'],
   timeline: ['As soon as possible', 'Within 3 months', '3–6 months', '6–12 months', 'Just researching'],
   contact_method: ['email', 'text', 'call'],
-  request_type: ['Home comparison', 'Pricing report', 'Consultation']
+  request_type: [
+    'Home comparison', 'Pricing report', 'Consultation', 'Buyer readiness plan',
+    'Seller pricing and preparation', 'Open-house details',
+    'Buyer planning call', 'Seller planning conversation'
+  ],
+  campaign_id: ['C1', 'C2', 'C3', 'C4'],
+  readiness_question: ['Process', 'Financing conversation', 'Home search', 'Representation', 'Not sure yet'],
+  meeting_format: ['Phone', 'Video']
 });
+const CAMPAIGN_REQUESTS = Object.freeze({
+  C1: ['Home comparison', 'Buyer planning call'],
+  C2: ['Buyer readiness plan', 'Buyer planning call'],
+  C3: ['Seller pricing and preparation', 'Seller planning conversation'],
+  C4: ['Open-house details']
+});
+const GENERAL_REQUESTS = ['Home comparison', 'Pricing report', 'Consultation'];
+const SCHEDULING_REQUESTS = ['Buyer planning call', 'Seller planning conversation'];
 
 class InvalidInput extends Error {}
 class BodyTooLarge extends Error {}
@@ -109,6 +124,12 @@ function choice(data, field, required = false) {
   return value;
 }
 
+function optionalCheckbox(data, field) {
+  if (data[field] === undefined || data[field] === '' || data[field] === false) return false;
+  if (data[field] === true || data[field] === 'on') return true;
+  throw new InvalidInput();
+}
+
 function normalizeLead(data) {
   if (text(data, '_honey', 200)) throw new InvalidInput();
   if (data.contact_consent !== true && data.contact_consent !== 'on') throw new InvalidInput();
@@ -129,7 +150,13 @@ function normalizeLead(data) {
     throw new InvalidInput();
   }
   const contactMethod = choice(data, 'contact_method') || 'email';
-  if (['text', 'call'].includes(contactMethod) && !phone) throw new InvalidInput();
+  const meetingFormat = choice(data, 'meeting_format');
+  if ((['text', 'call'].includes(contactMethod) || meetingFormat === 'Phone') && !phone) throw new InvalidInput();
+  const campaignId = choice(data, 'campaign_id');
+  const requestType = choice(data, 'request_type');
+  if (campaignId && !CAMPAIGN_REQUESTS[campaignId].includes(requestType)) throw new InvalidInput();
+  if (!campaignId && requestType && !GENERAL_REQUESTS.includes(requestType)) throw new InvalidInput();
+  const isSchedulingRequest = SCHEDULING_REQUESTS.includes(requestType);
 
   const lead = {
     firstName, lastName, email, phone, contactMethod,
@@ -137,8 +164,19 @@ function normalizeLead(data) {
     area: choice(data, 'area'),
     budget: choice(data, 'budget'),
     timeline: choice(data, 'timeline'),
-    requestType: choice(data, 'request_type'),
-    areaOrListing: text(data, 'area_or_listing', 2_048),
+    requestType, campaignId, meetingFormat,
+    priorityOne: text(data, 'priority_one', 300),
+    priorityTwo: text(data, 'priority_two', 300),
+    readinessQuestion: choice(data, 'readiness_question'),
+    personalizedOutline: optionalCheckbox(data, 'personalized_outline'),
+    completedSteps: text(data, 'completed_steps', 1_500, { multiline: true }),
+    propertyAddress: text(data, 'property_address', 500, { required: requestType === 'Seller pricing and preparation' }),
+    propertyNotes: text(data, 'property_notes', 2_000, { multiline: true }),
+    preferredTimeOne: text(data, 'preferred_time_one', 200, { required: isSchedulingRequest }),
+    preferredTimeTwo: text(data, 'preferred_time_two', 200),
+    timezone: text(data, 'timezone', 100, { required: isSchedulingRequest }),
+    propertySlug: text(data, 'property_slug', 100),
+    areaOrListing: text(data, 'area_or_listing', 2_048, { multiline: true }),
     message: text(data, 'message', 4_000, { multiline: true }),
     ctaSource: text(data, 'cta_source', 150),
     cookieChoice: text(data, 'cookie_choice', 50),
@@ -148,6 +186,8 @@ function normalizeLead(data) {
     referrerOrigin: text(data, 'referrer_origin', 300),
     campaign: {}
   };
+  if (isSchedulingRequest && !meetingFormat) throw new InvalidInput();
+  if (lead.propertySlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lead.propertySlug)) throw new InvalidInput();
   if (lead.landingPage && (!lead.landingPage.startsWith('/') || lead.landingPage.startsWith('//') || /[?#\\]/u.test(lead.landingPage))) {
     throw new InvalidInput();
   }
@@ -174,11 +214,28 @@ function normalizeLead(data) {
 function eventPayload(lead, system) {
   const details = [
     ['Request', lead.requestType],
+    ['Offer', lead.campaignId],
     ['Interest', lead.interest],
     ['Preferred contact', lead.contactMethod],
     ['Area', lead.area],
     ['Budget', lead.budget],
     ['Timeline', lead.timeline],
+    ['First priority', lead.priorityOne],
+    ['Second priority', lead.priorityTwo],
+    ['Readiness question', lead.readinessQuestion],
+    ['Personalized outline requested', lead.personalizedOutline
+      ? 'Yes — an additional service request, not marketing permission'
+      : lead.campaignId === 'C2' && lead.requestType === 'Buyer readiness plan'
+        ? 'No — checklist copy only' : ''],
+    ['Steps already completed', lead.completedSteps],
+    ['Property address', lead.propertyAddress],
+    ['Property notes', lead.propertyNotes],
+    ['First proposed time', lead.preferredTimeOne],
+    ['Alternative proposed time', lead.preferredTimeTwo],
+    ['Time zone', lead.timezone],
+    ['Meeting format requested', lead.meetingFormat],
+    ['Scheduling status', SCHEDULING_REQUESTS.includes(lead.requestType) ? 'Time request only — no appointment has been booked or confirmed' : ''],
+    ['Property reference', lead.propertySlug],
     ['Town or listing', lead.areaOrListing],
     ['Message', lead.message],
     ['Contact consent', 'Yes — contact about this request'],
