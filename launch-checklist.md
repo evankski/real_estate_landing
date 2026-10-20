@@ -4,7 +4,7 @@
 
 Confirm Evan Karwowski name spelling.
 Confirm DRE #02102429.
-Confirm Broker: Karwowski, Inc. DRE #02224747.
+Confirm Broker: WR Properties DRE #02029047.
 Confirm broker approves the homepage, lead forms, footer disclosures, lead magnets, fee language, and paid ad copy.
 
 ## Privacy and tracking
@@ -29,9 +29,9 @@ Use consistent NAP details across website, Google profile, social profiles, and 
 ## Forms
 
 Submit a test form.
-Confirm the email arrives.
-Confirm the form records the question, contact consent, optional marketing consent, and cookie choice.
-Confirm successful submissions return to the branded thanks page.
+Confirm the inquiry appears in Follow Up Boss after adding the API key, or arrives by the configured FormSubmit email fallback before activation.
+Confirm the form records the request, budget, area, timing, contact preference, contact consent, campaign attribution, and cookie choice.
+Confirm successful submissions return to the branded thanks page; direct visits to that URL must not count as a new lead.
 Confirm your follow up does not imply legal, lending, tax, insurance, or financial advice.
 
 ## Paid traffic

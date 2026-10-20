@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title>Evan Karwowski Real Estate</title>
-  <rect width="512" height="512" fill="#22211e"/>
-  <rect x="42" y="42" width="12" height="428" fill="#d14b16"/>
-  <path fill="#f3efe6" d="M90 120h155v45H143v67h91v44h-91v71h108v45H90V120Zm186 0h53v111l80-111h63l-97 130 103 142h-65l-84-121v121h-53V120Z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="4" fill="#202c29"/><path d="M18 17h25v5H24v8h16v5H24v9h20v5H18z" fill="#dce8a4"/></svg>

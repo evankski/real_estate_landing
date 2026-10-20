@@ -1,0 +1,279 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
+
+const script = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+const NOW = 1_800_000_000_000;
+const CHOICE_KEY = 'ek_cookie_tracking_choice';
+const RECEIPT_KEY = 'ek_lead_receipt';
+const NEUTRAL_TITLE = 'Let’s talk about your next move.';
+
+function storage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
+  };
+}
+
+function element(textContent = '') {
+  const listeners = new Map();
+  const attributes = new Map();
+  const classes = new Set();
+  return {
+    textContent, hidden: false, disabled: false, value: '', dataset: {},
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      contains(name) { return classes.has(name); }
+    },
+    getAttribute(name) { return attributes.get(name) ?? null; },
+    setAttribute(name, value) { attributes.set(name, value); },
+    removeAttribute(name) { attributes.delete(name); },
+    addEventListener(name, callback) { listeners.set(name, callback); },
+    focus() {},
+    click() { listeners.get('click')?.(); }
+  };
+}
+
+// Execute the unchanged production script against a deliberately small DOM.
+// Injected script elements are recorded, never loaded; no network exists here.
+function openPage({
+  choice, gpc = false, thanks = false, search, receipt,
+  href = 'https://www.evankrealestate.com/', links = [],
+  localStorage = storage(choice ? { [CHOICE_KEY]: choice } : {}),
+  sessionStorage = storage(receipt === undefined ? {} : {
+    [RECEIPT_KEY]: typeof receipt === 'string' ? receipt : JSON.stringify(receipt)
+  })
+} = {}) {
+  const ids = Object.fromEntries([
+    'year', 'cookieBanner', 'acceptCookies', 'rejectCookies',
+    'cookieSettingsButton', 'doNotSellButton', 'cookieChoiceField',
+    'thanksTitle', 'thanksMessage'
+  ].map(id => [id, element(id === 'thanksTitle' ? NEUTRAL_TITLE : '')]));
+  const injectedScripts = [];
+  const anchors = links.map(href => {
+    const anchor = element();
+    anchor.setAttribute('href', href);
+    return anchor;
+  });
+  const firstScript = { parentNode: { insertBefore(script) { injectedScripts.push(script); } } };
+  const body = element();
+  if (thanks) body.dataset.leadSuccess = 'true';
+  const document = {
+    body,
+    documentElement: element(),
+    getElementById(id) { return ids[id] || null; },
+    querySelector() { return null; },
+    querySelectorAll(selector) { return selector === 'a[href]' ? anchors : []; },
+    createElement() { return element(); },
+    getElementsByTagName() { return [firstScript]; },
+    contains(node) { return Object.values(ids).includes(node); }
+  };
+  const navigator = { globalPrivacyControl: gpc };
+  const location = new URL(href);
+  if (search !== undefined) location.search = search;
+  const window = { localStorage, sessionStorage, location, navigator };
+  class FixedDate extends Date {
+    static now() { return NOW; }
+  }
+  runInNewContext(script, {
+    window, document, navigator, URLSearchParams, URL, Date: FixedDate,
+    console: { warn() {} }
+  }, { timeout: 1000, filename: 'script.js' });
+  const calls = () => Array.from(window.fbq?.queue || [], args => Array.from(args));
+  const leadCount = () => calls().filter(args => args[0] === 'track' && args[1] === 'Lead').length;
+  return { ids, anchors, injectedScripts, window, localStorage, sessionStorage, calls, leadCount };
+}
+
+test('fresh visitors load no pixel until they explicitly allow tracking', () => {
+  const page = openPage();
+  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.window.fbq, undefined);
+  assert.equal(page.ids.cookieBanner.hidden, false);
+  assert.equal(page.ids.cookieChoiceField.value, 'not selected');
+
+  page.ids.acceptCookies.click();
+  assert.equal(page.localStorage.getItem(CHOICE_KEY), 'accepted');
+  assert.equal(page.ids.cookieBanner.hidden, true);
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.injectedScripts[0].src, 'https://connect.facebook.net/en_US/fbevents.js');
+  assert.ok(page.calls().some(args => args[0] === 'init' && args[1] === '2061494168135844'));
+  assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
+  page.ids.acceptCookies.click();
+  assert.equal(page.injectedScripts.length, 1);
+  assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
+});
+
+test('declining tracking loads no pixel and is remembered on another visit', () => {
+  const page = openPage();
+  page.ids.rejectCookies.click();
+  assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
+  assert.equal(page.ids.cookieChoiceField.value, 'rejected');
+  assert.equal(page.ids.cookieBanner.hidden, true);
+  assert.equal(page.injectedScripts.length, 0);
+  const nextVisit = openPage({ localStorage: page.localStorage });
+  assert.equal(nextVisit.injectedScripts.length, 0);
+  assert.equal(nextVisit.ids.cookieBanner.hidden, true);
+});
+
+test('withdrawing previously granted tracking sends consent revoke', () => {
+  const page = openPage({ choice: 'accepted' });
+  page.ids.doNotSellButton.click();
+  assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
+  assert.ok(page.calls().some(args => args[0] === 'consent' && args[1] === 'revoke'));
+});
+
+test('GPC overrides a stored acceptance and cannot be overridden by an allow action', () => {
+  const page = openPage({
+    choice: 'accepted', gpc: true, thanks: true, search: '?submitted=1',
+    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+  });
+  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.leadCount(), 0);
+  assert.equal(page.ids.cookieChoiceField.value, 'rejected');
+  page.ids.cookieSettingsButton.click();
+  assert.equal(page.ids.acceptCookies.disabled, true);
+  // Invoke the handler even though a real disabled button cannot be clicked.
+  page.ids.acceptCookies.click();
+  assert.equal(page.localStorage.getItem(CHOICE_KEY), 'rejected');
+  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.leadCount(), 0);
+});
+
+test('visiting the thank-you URL directly never records a lead or confirms delivery', () => {
+  const page = openPage({ choice: 'accepted', thanks: true, search: '?submitted=1' });
+  assert.equal(page.leadCount(), 0);
+  assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+});
+
+test('a recent accepted receipt records one lead, is consumed, and cannot replay', () => {
+  const page = openPage({
+    choice: 'accepted', thanks: true, search: '?submitted=1',
+    receipt: { status: 'accepted', acceptedAt: NOW - 9 * 60 * 1000 }
+  });
+  assert.equal(page.leadCount(), 1);
+  assert.equal(page.sessionStorage.getItem(RECEIPT_KEY), null);
+  assert.equal(page.ids.thanksTitle.textContent, 'Your inquiry is on its way.');
+  page.ids.acceptCookies.click();
+  page.ids.acceptCookies.click();
+  assert.equal(page.leadCount(), 1);
+  const reload = openPage({
+    thanks: true, search: '?submitted=1',
+    localStorage: page.localStorage, sessionStorage: page.sessionStorage
+  });
+  assert.equal(reload.leadCount(), 0);
+  assert.equal(reload.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+});
+
+test('an accepted receipt waits for tracking consent and still records only once', () => {
+  const page = openPage({
+    thanks: true, search: '?submitted=1',
+    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+  });
+  assert.equal(page.injectedScripts.length, 0);
+  assert.equal(page.leadCount(), 0);
+  assert.equal(page.ids.thanksTitle.textContent, 'Your inquiry is on its way.');
+  page.ids.acceptCookies.click();
+  assert.equal(page.leadCount(), 1);
+  page.ids.acceptCookies.click();
+  assert.equal(page.leadCount(), 1);
+});
+
+for (const [reason, receipt] of [
+  ['expired at the ten-minute boundary', { status: 'accepted', acceptedAt: NOW - 10 * 60 * 1000 }],
+  ['unknown status', { status: 'pending', acceptedAt: NOW - 1000 }],
+  ['future timestamp', { status: 'accepted', acceptedAt: NOW + 1000 }],
+  ['missing timestamp', { status: 'accepted' }],
+  ['invalid JSON', '{not valid JSON']
+]) {
+  test(`${reason} receipts never record a lead or confirm delivery`, () => {
+    const page = openPage({ choice: 'accepted', thanks: true, search: '?submitted=1', receipt });
+    assert.equal(page.leadCount(), 0);
+    assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+  });
+}
+
+test('a receipt without the expected redirect flag does not record a lead', () => {
+  const page = openPage({
+    choice: 'accepted', thanks: true,
+    receipt: { status: 'accepted', acceptedAt: NOW - 1000 }
+  });
+  assert.equal(page.leadCount(), 0);
+  assert.equal(page.ids.thanksTitle.textContent, NEUTRAL_TITLE);
+});
+
+test('same-origin links carry only allowlisted campaign fields, each bounded to 200 characters', () => {
+  const query = new URLSearchParams({
+    utm_source: 'instagram',
+    utm_medium: 'paid social',
+    utm_campaign: 'home search',
+    utm_content: 'x'.repeat(250),
+    utm_term: 'east bay',
+    email: 'qa@example.invalid',
+    phone: 'not-for-links',
+    fbclid: 'not-carried',
+    arbitrary: 'not-carried'
+  });
+  const page = openPage({
+    href: `https://www.evankrealestate.com/?${query}`,
+    links: ['areas/brentwood-ca-real-estate.html', 'https://www.evankrealestate.com/privacy.html']
+  });
+  for (const anchor of page.anchors) {
+    const destination = new URL(anchor.getAttribute('href'), page.window.location.href);
+    assert.equal(destination.origin, page.window.location.origin);
+    assert.deepEqual([...destination.searchParams.keys()].sort(), [
+      'utm_campaign', 'utm_content', 'utm_medium', 'utm_source', 'utm_term'
+    ]);
+    assert.equal(destination.searchParams.get('utm_source'), 'instagram');
+    assert.equal(destination.searchParams.get('utm_medium'), 'paid social');
+    assert.equal(destination.searchParams.get('utm_campaign'), 'home search');
+    assert.equal(destination.searchParams.get('utm_content'), 'x'.repeat(200));
+    assert.equal(destination.searchParams.get('utm_term'), 'east bay');
+    assert.equal(destination.searchParams.has('email'), false);
+    assert.equal(destination.searchParams.has('phone'), false);
+    assert.equal(destination.searchParams.has('fbclid'), false);
+  }
+  assert.equal(new URL(page.anchors[0].getAttribute('href'), page.window.location.href).pathname,
+    '/areas/brentwood-ca-real-estate.html');
+});
+
+test('campaign propagation preserves destination query values and fragments', () => {
+  const page = openPage({
+    href: 'https://www.evankrealestate.com/areas/brentwood-ca-real-estate.html?utm_source=instagram&utm_campaign=fall',
+    links: ['../index.html?intent=buy&area=Brentwood&utm_source=area-guide#contactForm']
+  });
+  const destination = new URL(page.anchors[0].getAttribute('href'), page.window.location.href);
+  assert.equal(destination.pathname, '/index.html');
+  assert.equal(destination.searchParams.get('utm_source'), 'area-guide');
+  assert.equal(destination.searchParams.get('utm_campaign'), 'fall');
+  assert.equal(destination.searchParams.get('intent'), 'buy');
+  assert.equal(destination.searchParams.get('area'), 'Brentwood');
+  assert.equal(destination.hash, '#contactForm');
+});
+
+test('campaign propagation skips fragments and external or non-web links', () => {
+  const links = [
+    '#contactForm',
+    'https://www.wrpropertiesre.com/team',
+    '//www.wrpropertiesre.com/team',
+    'https://www.evankrealestate.com:444/other',
+    'tel:+19254927023',
+    'mailto:evan@thewowski.com',
+    'javascript:void(0)',
+    ''
+  ];
+  const page = openPage({ search: '?utm_source=instagram', links });
+  assert.deepEqual(page.anchors.map(anchor => anchor.getAttribute('href')), links);
+});
+
+test('arbitrary visitor query fields alone never rewrite links', () => {
+  const links = ['areas/brentwood-ca-real-estate.html', '#contactForm'];
+  const page = openPage({
+    search: '?email=qa%40example.invalid&phone=not-for-links&arbitrary=value',
+    links
+  });
+  assert.deepEqual(page.anchors.map(anchor => anchor.getAttribute('href')), links);
+});
