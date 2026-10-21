@@ -11,7 +11,7 @@
     const primary = document.querySelector('.campaign-actions .button');
     if (primary) {
       primary.href = '#sample';
-      primary.textContent = 'View the sample ↗';
+      primary.textContent = 'View the sample';
     }
     const source = document.getElementById('ctaSourceField');
     if (source) source.value = 'compare-sample-variant';

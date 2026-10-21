@@ -36,6 +36,8 @@ html:has(.campaign-page){scroll-padding-top:24px}
 .video-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;border:0;background:#10251935;color:#fff;font-size:13px;font-weight:700;text-shadow:0 1px 4px #000}
 .video-play:hover{background:#10251950}
 .play-icon{display:grid;place-items:center;width:68px;height:68px;border-radius:50%;padding-left:4px;background:#e1edb3;color:#243a2b;font-size:27px;box-shadow:0 0 0 9px #e1edb32b;text-shadow:none}
+/* A drawn play control avoids mobile emoji-font rendering. */
+.play-icon::before{content:"";width:0;height:0;border-top:12px solid transparent;border-bottom:12px solid transparent;border-left:19px solid currentColor}
 .video-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;font-size:10px;line-height:1.45;color:#65705f;padding:6px 2px 0;text-align:left}
 .video-meta>span{flex:1}
 .video-transcript{max-width:55%;text-align:right;position:relative}
