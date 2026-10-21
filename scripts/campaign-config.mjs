@@ -24,7 +24,7 @@ export const campaigns = {
     cta: 'Request my home comparison',
     requestType: 'Home comparison',
     interest: 'Buying a home',
-    delivery: 'Your comparison within two business days after I receive your search preferences. A planning call is optional.',
+    delivery: 'I will follow up promptly to understand your priorities and get your comparison started. A planning call is optional.',
     summaryTitle: 'A useful comparison starts with your priorities.',
     summaryBullets: [
       'Up to three available options, including homes you send when appropriate.',
@@ -74,7 +74,7 @@ export const campaigns = {
     formTitle: 'What should we compare?',
     formIntro: 'A few preferences will make the comparison useful. If you are unsure about something, say so.',
     thanksTitle: 'Your home-comparison request is received.',
-    thanksMessage: 'I will review your preferences and contact you if I need more detail. Your comparison will follow within two business days after I have the necessary information. A planning call is optional.',
+    thanksMessage: 'I will review your preferences and follow up personally as soon as I can to get your comparison started. A planning call is optional.',
     callMinutes: 15,
   },
   'buyer-plan': {
@@ -86,7 +86,7 @@ export const campaigns = {
     cta: 'Read the buyer checklist',
     requestType: 'Buyer readiness plan',
     interest: 'Buying a home',
-    delivery: 'The checklist is available here now. If you request a personalized outline, I will send it within two business days after receiving the necessary details.',
+    delivery: 'The checklist is available here now. Request an email copy or a personalized outline, and I will follow up with you directly.',
     summaryTitle: 'You do not need every answer to begin.',
     summaryBullets: [
       'A public checklist covering priorities, financing questions, representation, and tours.',
@@ -132,7 +132,7 @@ export const campaigns = {
     formTitle: 'Keep the checklist. Ask for more help if you want it.',
     formIntro: 'Request an email copy below. For a personalized outline, select the optional checkbox and tell me what you have already completed and what still feels unclear. Please keep financial documents out of this form.',
     thanksTitle: 'Your checklist request is received.',
-    thanksMessage: 'I will respond personally to your request for an email copy. If you also requested a personalized outline, I will send it within two business days after I have the necessary details. The public checklist is available to read or print now.',
+    thanksMessage: 'I will follow up personally as soon as I can with your email copy and help with your next steps if you requested a personalized outline. The public checklist is available to read or print now.',
     callMinutes: 15,
   },
   'seller-plan': {
@@ -144,7 +144,7 @@ export const campaigns = {
     cta: 'Request my seller plan',
     requestType: 'Seller pricing and preparation',
     interest: 'Selling a home',
-    delivery: 'A preliminary review within two business days after I receive the necessary property details. Some recommendations may require a walkthrough.',
+    delivery: 'I will follow up promptly to discuss your property and get your preliminary review started. Some recommendations may require a walkthrough.',
     summaryTitle: 'Make the next decision with better information.',
     summaryBullets: [
       'Relevant comparable sales, with the reasons they matter and the limits of the comparison.',
@@ -194,7 +194,7 @@ export const campaigns = {
     formTitle: 'Tell me about your property.',
     formIntro: 'Start with the address, approximate selling timeframe, and what you want to understand. A request does not commit you to listing.',
     thanksTitle: 'Your seller-plan request is received.',
-    thanksMessage: 'I will review the information and contact you if a detail is missing. The preliminary review will follow within two business days after I have the necessary property details. Some conclusions may need a walkthrough, which we would arrange separately.',
+    thanksMessage: 'I will review your property details and follow up personally as soon as I can to discuss your next steps. Some conclusions may need a walkthrough, which we would arrange separately.',
     callMinutes: 20,
   },
 };

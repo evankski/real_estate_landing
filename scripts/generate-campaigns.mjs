@@ -65,19 +65,19 @@ const firstScreen = {
   compare: {
     lines: ['Compare homes.', 'See what actually matters.'],
     lede: 'A personal comparison of up to three Brentwood or Oakley homes, with the trade-offs and open questions explained.',
-    promise: 'Delivered within two business days of receiving your search preferences.',
+    promise: 'Your request comes directly to me. I will be in touch promptly.',
     cta: 'Get my home comparison',
   },
   'buyer-plan': {
     lines: ['Buying a home?', 'Start with a clear plan.'],
     lede: 'Get the buyer checklist. Then, if you want, ask me to map out your next three steps around where you are today.',
-    promise: 'Checklist available now. Optional personal outline within two business days of receiving your details.',
+    promise: 'Read the checklist now. Get personal help with your next steps.',
     cta: 'Email me the buyer checklist',
   },
   'seller-plan': {
     lines: ['Before you list,', 'get a plan for price & prep.'],
     lede: 'Relevant comparable sales and preparation priorities for your Brentwood or Oakley home, reviewed personally by me.',
-    promise: 'Preliminary plan within two business days of receiving your property details.',
+    promise: 'Your request comes directly to me. I will be in touch promptly.',
     cta: 'Get my seller plan',
   },
 };

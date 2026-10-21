@@ -1,6 +1,6 @@
 # Campaign pages
 
-The campaign library follows the supplied [campaign manual](/Users/evan/Downloads/Evan_Karwowski_Complete_Real_Estate_Campaign_Manual.pdf). Its updated presentation uses the existing green palette with the centered headline, video and prominent action structure of the [Acquisition.com workshop landing page](https://lp.acquisition.com/workshop-sales-4b). Evan confirmed the delivery promise: personalized comparisons, buyer outlines and preliminary seller reviews are due within two business days after the necessary details arrive. A call remains optional.
+The campaign library follows the supplied [campaign manual](/Users/evan/Downloads/Evan_Karwowski_Complete_Real_Estate_Campaign_Manual.pdf). Its updated presentation uses the existing green palette with the centered headline, video and prominent action structure of the [Acquisition.com workshop landing page](https://lp.acquisition.com/workshop-sales-4b). At Evan's request, campaign copy emphasizes prompt personal follow-up without a fixed turnaround promise for personalized comparisons, buyer outlines or preliminary seller reviews. A call remains optional.
 
 The main offers place the video and request button on the first screen, followed immediately by the inquiry section. Supporting booking, confirmation, preferences and resource pages share the same typography, compact header and buttons. The main homepage is unchanged. Booking pages put the form beside the introduction on desktop. No autoplay, countdown, invented testimonial or video-watching requirement is added.
 

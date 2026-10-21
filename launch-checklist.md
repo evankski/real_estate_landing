@@ -36,8 +36,8 @@ lawful targeting, consent, service delivery, or data handling.
 
 Campaign expansion on October 20 adds three offer pages, their confirmation and
 manual scheduling pages, a public printable buyer checklist, a communication
-preferences page, and an open-house hub/template. Evan confirmed the advertised
-two-business-day delivery commitment after receiving the necessary details.
+preferences page, and an open-house hub/template. Campaign copy emphasizes prompt
+personal follow-up without a fixed delivery deadline, at Evan's request.
 There is no booking-provider link yet: scheduling forms request preferred times
 and require Evan's personal confirmation. Checklist email copies and
 personalized work are fulfilled personally, not by a newly added autoresponder.
