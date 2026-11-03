@@ -19,7 +19,7 @@ Run `npm run build` after those edits and include the regenerated HTML in your
 next commit. `campaigns.css` and `campaigns.js` supply the shared presentation
 and optional browser enhancements.
 
-GitHub Pages cannot run the FUB API endpoint. On a static host, an absent endpoint
+GitHub Pages cannot run the FUB API endpoint. C02 appointment requests require the hosted Worker for reliable capture and automatic email; see [C02 email setup](CAMPAIGN-02.md#turn-on-appointment-email). For other forms on a static host, an absent endpoint
 (404) or unsupported POST (405) sends the form through the existing FormSubmit
 email route to `evan@thewowski.com`. That email service must be activated for the
 recipient. Direct FUB delivery requires a separately hosted endpoint that keeps
@@ -39,8 +39,16 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://127.0.0.1:4173`. The local server binds only to the loopback interface.
+Open `http://127.0.0.1:4173`. The local server binds only to the loopback interface
+and restarts when its server code changes. Run `npm run build` after editing page
+templates and refresh your browser for the updated HTML.
 Set `PORT` in `.env` to use another port.
+
+Without a local FUB key, valid forms on this loopback server open their next
+page in **preview mode**. The page identifies it as a preview: no email or CRM
+request is sent, no contact details are saved, and no Lead conversion is counted.
+Use sample details when testing. After setting a real key, restart the server:
+submitting other forms then sends a real FUB inquiry. The C02 appointment form on this Node preview always previews locally; test its durable capture and email with the Worker.
 
 The server loads `.env` with Node's native environment-file reader. Add your
 Follow Up Boss API key to `FUB_API_KEY` when ready. Never paste that key into
@@ -65,7 +73,8 @@ automation settings must be reviewed separately: a note stating that marketing
 permission was not collected does not prevent an existing action plan from running.
 UTM source, medium, campaign, term, and content map to the FUB campaign object
 when a UTM source is present; partial attribution stays in the message.
-The lead source is `evankrealestate.com`.
+The lead source is `evankrealestate.com`. Recognized campaign forms and paid ad
+traffic receive server-generated acquisition tags. See [C02 attribution and ad links](CAMPAIGN-02.md#fub-tags-and-advertising-links).
 
 Set `FUB_SYSTEM` to your integration's system name. It defaults to
 `EvanKarwowskiWebsite`. If your FUB integration has a registered system key, set
@@ -74,22 +83,22 @@ FUB's documentation asks integrations to register a system and supply its
 assigned `X-System` and `X-System-Key` headers. Use your existing registration,
 or complete that setup with FUB when activating this integration.
 
-Without `FUB_API_KEY`, the endpoint returns HTTP 503 with code `NOT_CONFIGURED`
-and sends nothing to FUB. Only FUB HTTP 200 or 201 counts as delivered.
+With `FUB_API_KEY`, only FUB HTTP 200 or 201 counts as accepted.
 FUB 204 means the lead source was archived and ignored, so the site treats it
-as failure. The endpoint has a ten-second upstream timeout, does not retry an
-ambiguous delivery, and never returns FUB contact records or secret details.
+as failure. The usual upstream timeout is ten seconds. C02 appointment requests use the durable delivery described below; other forms do not retry ambiguous deliveries.
 
-The existing FormSubmit email route to `evan@thewowski.com` remains a fallback
-when the endpoint is absent, rejects POST as unsupported, or explicitly reports
-`NOT_CONFIGURED`. Once the API
-is configured, leads use FUB. FUB's Lead Flow controls assignment and any follow-up
+For other forms on the public backend without a key, the server validates the inquiry and sends
+it to FormSubmit for `evan@thewowski.com`; the browser only contacts its own
+site. On a static host with no API (404/405), or an older public API reporting
+`NOT_CONFIGURED`, the browser uses form-encoded AJAX without a JSON preflight.
+Both routes require a positive provider response before counting a conversion.
+Email routing needs an activated FormSubmit recipient and does not import into
+FUB. FUB's Lead Flow controls assignment and any follow-up
 actions; review existing action plans and source configuration before activating
 API delivery. As of October 20, 2026, Evan has not decided whether to use
 automated follow-up or call recording, and no FUB account settings have been
 inspected or changed as part of this website work.
-The server does not silently switch to another provider after an ambiguous
-network failure or a FUB delivery error.
+C02 time requests are saved before acknowledgment. A private outbox sends email to Evan and independently delivers to FUB if configured. A temporary provider failure schedules another attempt; buyers don't write an email or wait for either provider. [Setup and verification](CAMPAIGN-02.md#turn-on-appointment-email).
 
 Production form requests are accepted from `https://evankrealestate.com` and
 `https://www.evankrealestate.com`. Local requests must use the same loopback

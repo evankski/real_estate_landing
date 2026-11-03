@@ -1,6 +1,20 @@
-const FUB_ENDPOINT = 'https://api.followupboss.com/v1/events';
+import { worksheetCampaigns } from './worksheet-campaigns.mjs';
+import { firstHomeAppointment } from './first-home-appointment.mjs';
+import { saveAppointment } from './c02-outbox.mjs';
+import { submitFubEvent } from './fub-event.mjs';
+
+const worksheets = Object.values(worksheetCampaigns);
+
+const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/evan@thewowski.com';
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const MAX_BODY_BYTES = 16_384;
 const REQUEST_TIMEOUT_MS = 10_000;
+const PAID_MEDIA = new Set(['paid', 'ad', 'ads', 'paidmedia', 'paidsocial', 'socialpaid', 'paidsearch',
+  'paidvideo', 'display', 'ppc', 'cpc', 'cpm', 'retargeting', 'remarketing']);
+const CHANNEL_NAMES = new Map([
+  ['facebook', 'Facebook'], ['fb', 'Facebook'], ['instagram', 'Instagram'], ['ig', 'Instagram'],
+  ['meta', 'Meta'], ['google', 'Google'], ['googleads', 'Google'], ['adwords', 'Google']
+]);
 export const CONTACT_CONSENT_VERSION = '2026-10-19-inquiry-v2';
 export const CONTACT_CONSENT_TEXT = 'I ask Evan Karwowski with WR Properties to reply to this inquiry using my selected contact method. This is not consent to automated marketing calls, marketing texts, or an email newsletter.';
 const PUBLIC_ORIGINS = new Set([
@@ -17,25 +31,28 @@ export const LEAD_OPTIONS = Object.freeze({
   request_type: [
     'Home comparison', 'Pricing report', 'Consultation', 'Buyer readiness plan',
     'Seller pricing and preparation', 'Open-house details',
-    'Buyer planning call', 'Seller planning conversation'
+    'Buyer planning call', 'Seller planning conversation',
+    ...worksheets.flatMap(c => [c.resourceType, c.title]), worksheetCampaigns.C02.manualType
   ],
-  campaign_id: ['C1', 'C2', 'C3', 'C4'],
+  campaign_id: ['C1', 'C2', 'C3', 'C4', ...worksheets.map(c => c.id)],
   readiness_question: ['Process', 'Financing conversation', 'Home search', 'Representation', 'Not sure yet'],
-  meeting_format: ['Phone', 'Video']
+  meeting_format: ['Phone', 'Video'],
+  representation_status: ['Not working with an agent', 'Working with an agent', 'Not sure']
 });
 const CAMPAIGN_REQUESTS = Object.freeze({
   C1: ['Home comparison', 'Buyer planning call'],
   C2: ['Buyer readiness plan', 'Buyer planning call'],
   C3: ['Seller pricing and preparation', 'Seller planning conversation'],
-  C4: ['Open-house details']
+  C4: ['Open-house details'],
+  ...Object.fromEntries(worksheets.map(c => [c.id, [c.resourceType, c.title, ...(c.manualType ? [c.manualType] : [])]]))
 });
 const GENERAL_REQUESTS = ['Home comparison', 'Pricing report', 'Consultation'];
-const SCHEDULING_REQUESTS = ['Buyer planning call', 'Seller planning conversation'];
+const SCHEDULING_REQUESTS = ['Buyer planning call', 'Seller planning conversation', ...worksheets.map(c => c.title)];
 
 class InvalidInput extends Error {}
 class BodyTooLarge extends Error {}
 
-function reply(status, code, origin) {
+function reply(status, code, origin, delivery) {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
@@ -43,7 +60,7 @@ function reply(status, code, origin) {
     'Vary': 'Origin'
   };
   if (origin) headers['Access-Control-Allow-Origin'] = origin;
-  return new Response(JSON.stringify(code ? { success: false, code } : { success: true }), {
+  return new Response(JSON.stringify({ success: !code, code: code || undefined, delivery }), {
     status, headers
   });
 }
@@ -55,9 +72,8 @@ function permittedOrigin(request) {
   try {
     const target = new URL(request.url);
     const supplied = new URL(origin);
-    const localHosts = ['localhost', '127.0.0.1', '[::1]'];
     if (
-      localHosts.includes(target.hostname) &&
+      LOOPBACK_HOSTS.has(target.hostname) &&
       supplied.origin === target.origin &&
       origin === supplied.origin &&
       ['http:', 'https:'].includes(target.protocol)
@@ -130,6 +146,16 @@ function optionalCheckbox(data, field) {
   throw new InvalidInput();
 }
 
+function listingLink(data, field, required = false) {
+  const value = text(data, field, 600, { required });
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new InvalidInput();
+  } catch { throw new InvalidInput(); }
+  return value;
+}
+
 function normalizeLead(data) {
   if (text(data, '_honey', 200)) throw new InvalidInput();
   if (data.contact_consent !== true && data.contact_consent !== 'on') throw new InvalidInput();
@@ -157,27 +183,38 @@ function normalizeLead(data) {
   if (campaignId && !CAMPAIGN_REQUESTS[campaignId].includes(requestType)) throw new InvalidInput();
   if (!campaignId && requestType && !GENERAL_REQUESTS.includes(requestType)) throw new InvalidInput();
   const isSchedulingRequest = SCHEDULING_REQUESTS.includes(requestType);
+  const isShortlistReview = campaignId === 'C01' && requestType === 'Home Shortlist Review';
+  const isFirstHomeSession = campaignId === 'C02' && requestType === worksheetCampaigns.C02.title;
+  const manualFirstHome = campaignId === 'C02' && requestType === worksheetCampaigns.C02.manualType;
 
   const lead = {
     firstName, lastName, email, phone, contactMethod,
     interest: choice(data, 'interest', true),
     area: choice(data, 'area'),
     budget: choice(data, 'budget'),
-    timeline: choice(data, 'timeline'),
+    timeline: choice(data, 'timeline', isFirstHomeSession),
     requestType, campaignId, meetingFormat,
-    priorityOne: text(data, 'priority_one', 300),
-    priorityTwo: text(data, 'priority_two', 300),
+    priorityOne: text(data, 'priority_one', 300, { required: isShortlistReview }),
+    priorityTwo: text(data, 'priority_two', 300, { required: isShortlistReview }),
+    representationStatus: choice(data, 'representation_status', isShortlistReview || isFirstHomeSession || manualFirstHome),
+    buyingArea: manualFirstHome ? text(data, 'buying_area', 160, { required: true }) : '',
+    moveTiming: manualFirstHome ? text(data, 'move_timing', 80, { required: true }) : '',
+    lenderStatus: manualFirstHome ? text(data, 'lender_status', 80, { required: true }) : '',
+    listingOne: listingLink(data, 'listing_one', isShortlistReview),
+    listingTwo: listingLink(data, 'listing_two'),
+    listingThree: listingLink(data, 'listing_three'),
+    routeVersion: text(data, 'route_version', 40),
     readinessQuestion: choice(data, 'readiness_question'),
     personalizedOutline: optionalCheckbox(data, 'personalized_outline'),
-    completedSteps: text(data, 'completed_steps', 1_500, { multiline: true }),
+    completedSteps: text(data, 'completed_steps', 1_500, { multiline: true, required: isFirstHomeSession }),
     propertyAddress: text(data, 'property_address', 500, { required: requestType === 'Seller pricing and preparation' }),
     propertyNotes: text(data, 'property_notes', 2_000, { multiline: true }),
     preferredTimeOne: text(data, 'preferred_time_one', 200, { required: isSchedulingRequest }),
     preferredTimeTwo: text(data, 'preferred_time_two', 200),
-    timezone: text(data, 'timezone', 100, { required: isSchedulingRequest }),
+    timezone: text(data, 'timezone', 100, { required: isSchedulingRequest || manualFirstHome }),
     propertySlug: text(data, 'property_slug', 100),
     areaOrListing: text(data, 'area_or_listing', 2_048, { multiline: true }),
-    message: text(data, 'message', 4_000, { multiline: true }),
+    message: text(data, 'message', 4_000, { multiline: true, required: isFirstHomeSession }),
     ctaSource: text(data, 'cta_source', 150),
     cookieChoice: text(data, 'cookie_choice', 50),
     consentVersion: text(data, 'consent_version', 40),
@@ -186,6 +223,26 @@ function normalizeLead(data) {
     referrerOrigin: text(data, 'referrer_origin', 300),
     campaign: {}
   };
+  if (manualFirstHome) {
+    const phoneBooking = lead.routeVersion === worksheetCampaigns.C02.phoneBookingVersion;
+    if (phoneBooking) {
+      if (!phone) throw new InvalidInput();
+      lead.contactMethod = 'call';
+      lead.meetingFormat = 'Phone';
+    }
+    // Cached older forms submitted only a written time window. Their requests
+    // remain readable, but can't be turned into precise calendar events.
+    if (phoneBooking || lead.routeVersion === worksheetCampaigns.C02.version || data.appointment_start !== undefined) {
+      lead.appointment = firstHomeAppointment({
+        appointment_start: text(data,'appointment_start',30,{required:true}),
+        appointment_date: text(data,'appointment_date',10,{required:true}),
+        appointment_time: text(data,'appointment_time',5,{required:true}),
+        timezone: lead.timezone, name: [firstName,lastName].filter(Boolean).join(' '), email, phone
+      });
+      if (!lead.appointment) throw new InvalidInput();
+      lead.preferredTimeOne = lead.appointment.label;
+    } else if (!lead.preferredTimeOne) throw new InvalidInput();
+  }
   if (isSchedulingRequest && !meetingFormat) throw new InvalidInput();
   if (lead.propertySlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lead.propertySlug)) throw new InvalidInput();
   if (lead.landingPage && (!lead.landingPage.startsWith('/') || lead.landingPage.startsWith('//') || /[?#\\]/u.test(lead.landingPage))) {
@@ -211,17 +268,51 @@ function normalizeLead(data) {
   return lead;
 }
 
+// Tags come only from recognized forms and acquisition labels, never form answers.
+function sourceTags(lead) {
+  const medium = (lead.campaign.medium || '').toLowerCase().replace(/[-_ ]/g, '');
+  const paid = PAID_MEDIA.has(medium);
+  if (!paid && !lead.campaignId) return [];
+  const tags = ['Marketing lead'];
+  const worksheet = worksheetCampaigns[lead.campaignId];
+  if (lead.campaignId) tags.push(worksheet ? `${worksheet.id} - ${worksheet.title}` : `Campaign ${lead.campaignId}`);
+  if (worksheet?.resourceType === lead.requestType) tags.push('Worksheet request');
+  if (lead.requestType === worksheetCampaigns.C02.manualType) tags.push('Appointment request');
+  if (paid) tags.push('Paid ad');
+  const channel = CHANNEL_NAMES.get((lead.campaign.source || '').toLowerCase());
+  if (channel) tags.push(channel);
+  return tags;
+}
+
 function eventPayload(lead, system) {
+  const tags = sourceTags(lead);
+  const worksheet = worksheetCampaigns[lead.campaignId];
+  const resourceRequest = worksheet && lead.requestType === worksheet.resourceType;
+  const sessionState = lead.campaignId === 'C02' ? 'Time requested — Evan must confirm personally' : lead.representationStatus === 'Not working with an agent'
+    ? 'Session requested — scope and availability to confirm' : 'Eligibility pending — clarify existing representation before personalized work';
   const details = [
     ['Request', lead.requestType],
     ['Offer', lead.campaignId],
+    ['Source tags', tags.join(', ')],
+    ['Campaign name', worksheet ? `${worksheet.title} — November 2026` : ''],
+    ['Route version', worksheet ? lead.routeVersion : ''],
+    ['Funnel state', worksheet ? (resourceRequest ? 'Resource requested' : sessionState) : ''],
+    ['Resource link', worksheet ? `https://www.evankrealestate.com${worksheet.id === 'C02' ? worksheet.pdf : worksheet.watch}` : ''],
+    ['Resource follow-up', resourceRequest ? 'Personal email follow-up requested. Immediate on-page worksheet access; no automatic resource email was sent by this endpoint.' : ''],
     ['Interest', lead.interest],
     ['Preferred contact', lead.contactMethod],
     ['Area', lead.area],
+    ['Considering buying in', lead.buyingArea],
+    ['Move timing', lead.moveTiming],
+    ['Lender conversation', lead.lenderStatus],
     ['Budget', lead.budget],
     ['Timeline', lead.timeline],
     ['First priority', lead.priorityOne],
     ['Second priority', lead.priorityTwo],
+    ['Existing agent relationship', lead.representationStatus],
+    ['Public listing 1', lead.listingOne],
+    ['Public listing 2', lead.listingTwo],
+    ['Public listing 3', lead.listingThree],
     ['Readiness question', lead.readinessQuestion],
     ['Personalized outline requested', lead.personalizedOutline
       ? 'Yes — an additional service request, not marketing permission'
@@ -233,8 +324,9 @@ function eventPayload(lead, system) {
     ['First proposed time', lead.preferredTimeOne],
     ['Alternative proposed time', lead.preferredTimeTwo],
     ['Time zone', lead.timezone],
+    ['Review in Outlook using evan@thewowski.com, then save or send the invitation', lead.appointment?.outlookUrl],
     ['Meeting format requested', lead.meetingFormat],
-    ['Scheduling status', SCHEDULING_REQUESTS.includes(lead.requestType) ? 'Time request only — no appointment has been booked or confirmed' : ''],
+    ['Scheduling status', SCHEDULING_REQUESTS.includes(lead.requestType) || lead.requestType === worksheetCampaigns.C02.manualType ? 'Time request only — no appointment has been booked or confirmed' : ''],
     ['Property reference', lead.propertySlug],
     ['Town or listing', lead.areaOrListing],
     ['Message', lead.message],
@@ -253,6 +345,7 @@ function eventPayload(lead, system) {
   const person = {
     firstName: lead.firstName,
     lastName: lead.lastName,
+    ...(tags.length ? { tags } : {}),
     emails: [{ value: lead.email }],
     ...(lead.phone ? { phones: [{ value: lead.phone }] } : {})
   };
@@ -267,6 +360,46 @@ function eventPayload(lead, system) {
   // in the inquiry message without inventing a marketing source.
   if (lead.campaign.source) payload.campaign = lead.campaign;
   return payload;
+}
+
+async function emailInquiry(lead, payload, { fetchImpl, origin, signal }) {
+  // The provider envelope and recipient are server-controlled.
+  const email = await fetchImpl(EMAIL_ENDPOINT, {
+    method: 'POST', redirect: 'error', signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: origin + '/' },
+    body: JSON.stringify({
+      name: [lead.firstName, lead.lastName].filter(Boolean).join(' '),
+      email: lead.email, ...(lead.phone ? { phone: lead.phone } : {}),
+      message: payload.message,
+      _subject: (lead.requestType || 'Website inquiry') + ' | Evan Karwowski',
+      _url: origin + (lead.landingPage || '/'), _template: 'table', _captcha: 'false'
+    })
+  });
+  if (!email.ok) { await email.body?.cancel(); return false; }
+  const result = await email.json();
+  return result?.success === true || result?.success === 'true';
+}
+
+// Non-appointment forms still deliver synchronously.
+async function attemptDelivery(send, timeoutMs) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    const accepted = await Promise.race([
+      send(controller.signal),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error('upstream-timeout'));
+        }, timeoutMs);
+      })
+    ]);
+    return accepted ? 'accepted' : 'unconfirmed';
+  } catch {
+    return controller.signal.aborted ? 'timeout' : 'unconfirmed';
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -300,48 +433,31 @@ export async function handleLead(request, env = {}) {
   }
 
   const apiKey = typeof env.FUB_API_KEY === 'string' ? env.FUB_API_KEY.trim() : '';
-  if (!apiKey) return reply(503, 'NOT_CONFIGURED', origin);
+  const manual = lead.requestType === worksheetCampaigns.C02.manualType;
+  if ((manual ? !env.C02_OUTBOX : !apiKey) && origin === new URL(request.url).origin && LOOPBACK_HOSTS.has(new URL(origin).hostname)) {
+    // The local walkthrough can be exercised without retaining or transmitting a lead.
+    return reply(200, 'LOCAL_PREVIEW', origin);
+  }
   const system = typeof env.FUB_SYSTEM === 'string' && env.FUB_SYSTEM.trim()
     ? env.FUB_SYSTEM.trim() : 'EvanKarwowskiWebsite';
-  const controller = new AbortController();
-  let timer;
-  try {
-    const headers = {
-      'Authorization': `Basic ${btoa(`${apiKey}:`)}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-System': system
-    };
-    if (typeof env.FUB_SYSTEM_KEY === 'string' && env.FUB_SYSTEM_KEY.trim()) {
-      headers['X-System-Key'] = env.FUB_SYSTEM_KEY.trim();
+  const payload = eventPayload(lead, system);
+  if (manual) {
+    try {
+      await saveAppointment(env.C02_OUTBOX, lead, payload, Boolean(apiKey));
+      return reply(202, null, origin, {email:'queued', fub:apiKey ? 'queued' : 'not_configured'});
+    } catch {
+      console.error('C02 appointment storage unavailable');
+      return reply(503, 'INTAKE_UNAVAILABLE', origin);
     }
-    const fetchImpl = typeof env.fetch === 'function' ? env.fetch : globalThis.fetch;
-    const response = await Promise.race([
-      fetchImpl(FUB_ENDPOINT, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(eventPayload(lead, system)),
-        signal: controller.signal,
-        redirect: 'error'
-      }),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error('upstream-timeout'));
-        }, REQUEST_TIMEOUT_MS);
-      })
-    ]);
-    // FUB 204 means this source is archived and ignored, not delivered.
-    if (response.status !== 200 && response.status !== 201) {
-      await response.body?.cancel();
-      return reply(502, 'DELIVERY_FAILED', origin);
-    }
-    // No upstream content or contact data is returned to the browser.
-    await response.body?.cancel();
-    return reply(200, null, origin);
-  } catch {
-    return reply(controller.signal.aborted ? 504 : 502, controller.signal.aborted ? 'DELIVERY_TIMEOUT' : 'DELIVERY_FAILED', origin);
-  } finally {
-    clearTimeout(timer);
   }
+  const config = { apiKey, system, systemKey: env.FUB_SYSTEM_KEY, fetchImpl: env.fetch || globalThis.fetch, origin };
+  const fub = apiKey
+    ? await attemptDelivery(signal => submitFubEvent(payload, { ...config, signal }), REQUEST_TIMEOUT_MS)
+    : 'not_configured';
+  const email = !apiKey
+    ? await attemptDelivery(signal => emailInquiry(lead, payload, { ...config, signal }), REQUEST_TIMEOUT_MS)
+    : 'not_requested';
+  if (fub === 'accepted' || email === 'accepted') return reply(200, null, origin);
+  const timedOut = fub === 'timeout' || email === 'timeout';
+  return reply(timedOut ? 504 : 502, timedOut ? 'DELIVERY_TIMEOUT' : 'DELIVERY_FAILED', origin);
 }

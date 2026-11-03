@@ -1,0 +1,94 @@
+/* November C01: shared campaign colors and controls, a worksheet-led first screen. */
+[data-shortlist] h1 span{color:var(--action)}
+[data-shortlist] .campaign-form>fieldset>.consent{display:flex;align-items:flex-start;gap:10px;line-height:1.55}
+.shortlist-hero{display:grid;grid-template-columns:1.1fr 1fr;gap:64px;padding-block:36px 48px;align-items:start}
+.shortlist-intro h1{font-size:clamp(40px,4.1vw,57px);max-width:590px}
+.shortlist-intro h1 span{display:block}
+.shortlist-intro .campaign-lede{font-size:17px;margin:18px 0 24px}
+.shortlist-preview{display:flex;gap:24px;align-items:center;padding:18px;background:var(--soft);border:1px solid var(--line);margin-bottom:24px}
+.shortlist-preview img{width:112px;height:145px;object-fit:contain;box-shadow:0 3px 12px rgb(22 43 59 / 10%)}
+.shortlist-preview strong{display:block;font-size:20px;letter-spacing:-.02em;line-height:1.35}
+.shortlist-preview .eyebrow{font-size:10px;margin:0 0 8px}
+.shortlist-preview p:last-child{font-size:11px;margin:10px 0 0;color:var(--muted)}
+.shortlist-optin{padding:26px 28px;border:1px solid var(--line);border-top:1px solid var(--rule);background:var(--paper);border-radius:6px;min-width:0;scroll-margin-top:20px}
+.shortlist-optin h2{font-size:28px;line-height:1.1;margin:0 0 12px}
+.shortlist-access{font-size:14px;line-height:1.6;margin:0 0 16px;color:var(--muted)}
+[data-shortlist] .shortlist-optin .contact-form{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.shortlist-optin .form-head{display:none}
+.shortlist-optin .collection-notice{font-size:11px;line-height:1.55;margin:0 0 16px}
+[data-shortlist] .shortlist-optin .contact-form legend{font-size:15px;margin-bottom:12px}
+.shortlist-optin .form-grid{gap:13px}
+[data-shortlist] .shortlist-optin .campaign-form>fieldset>.consent{display:flex;align-items:flex-start;gap:10px;margin:16px 0;font-size:11px;line-height:1.55}
+[data-shortlist] .shortlist-optin .consent input{flex:0 0 auto;margin-top:2px}
+.shortlist-optin .form-submit-row,.shortlist-optin .form-submit-row .button{width:100%;margin:0}
+.shortlist-optin .form-note{font-size:10px;line-height:1.6;margin-bottom:0}
+.shortlist-backup{font-size:11px;line-height:1.5;margin:12px 0 0}
+.shortlist-backup a{color:var(--action);text-underline-offset:3px}
+.shortlist-mobile-action{display:none}
+.shortlist-watch{padding-top:30px;padding-bottom:40px;text-align:center}
+.shortlist-watch h1{margin:auto;font-size:clamp(36px,4.1vw,54px)}
+.shortlist-watch .campaign-lede{margin:16px auto 22px;max-width:700px}
+.shortlist-resource-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:12px}
+.shortlist-resource-help{max-width:650px;margin:14px auto 26px;font-size:12px;color:var(--muted);line-height:1.6}
+.shortlist-watch-video{max-width:740px;margin:0 auto}
+.shortlist-video-pending{display:grid;grid-template-columns:1fr 1.4fr;background:var(--mist);text-align:left;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.shortlist-video-pending>img{width:100%;height:100%;min-height:310px;max-height:350px;object-fit:cover;object-position:center 25%}
+.shortlist-video-pending>div{padding:28px}
+.shortlist-video-pending h2{font-size:36px;margin:0 0 16px}
+.shortlist-video-pending p:not(.eyebrow){font-size:13px;line-height:1.6;color:var(--muted)}
+.shortlist-review{display:grid;grid-template-columns:1fr 1fr;gap:56px}
+.shortlist-review h2{margin:0}
+.shortlist-outputs{margin:0 0 22px;padding-left:24px;line-height:1.7}
+.shortlist-outputs li{padding:10px 0 10px 8px;border-bottom:1px solid var(--line)}
+.shortlist-scope{font-size:12px;line-height:1.7;margin-bottom:22px}
+[data-shortlist] .campaign-form input[type=url]{min-width:0;width:100%}
+@media(max-width:920px){.shortlist-hero{gap:30px}.shortlist-intro h1{font-size:42px}.shortlist-optin{padding:22px}.shortlist-preview{gap:16px}.shortlist-preview strong{font-size:17px}}
+@media(max-width:920px){
+  .shortlist-hero{grid-template-columns:1fr;gap:28px;padding-top:24px;padding-bottom:32px}
+  .shortlist-intro h1{font-size:38px;line-height:1.04;max-width:500px}
+  .shortlist-intro>.eyebrow{font-size:10px;letter-spacing:.09em;margin-bottom:12px}
+  .shortlist-intro .campaign-lede{font-size:15px;line-height:1.55;margin:16px 0 20px}
+  .shortlist-mobile-action{display:block;margin-bottom:22px}
+  .shortlist-mobile-action .button{width:100%;min-height:54px;padding-inline:14px}
+  .shortlist-mobile-action p{font-size:11px;margin:10px 0 0;text-align:center;color:var(--muted)}
+  .shortlist-preview{padding:14px;margin-bottom:18px;gap:18px}
+  .shortlist-preview img{width:84px;height:109px}
+  .shortlist-preview strong{font-size:17px}
+  .shortlist-preview .eyebrow{font-size:9px}
+  .shortlist-preview p:last-child{font-size:10px}
+  .shortlist-intro .campaign-byline{margin-bottom:0}
+  .shortlist-optin{padding:22px 18px}
+  .shortlist-optin h2{font-size:28px}
+  .shortlist-watch{padding-top:24px}
+  .shortlist-watch h1{font-size:36px}
+  .shortlist-watch .campaign-lede{font-size:15px}
+  .shortlist-resource-actions{flex-direction:column}
+  .shortlist-resource-actions .button{padding-inline:14px;font-size:15px}
+  .shortlist-video-pending{grid-template-columns:.8fr 1.2fr}
+  .shortlist-video-pending>img{min-height:260px;max-height:none}
+  .shortlist-video-pending>div{padding:18px 16px}
+  .shortlist-video-pending h2{font-size:26px}
+  .shortlist-video-pending .eyebrow{font-size:9px}
+  .shortlist-video-pending .text-link{font-size:12px}
+  .shortlist-review{grid-template-columns:1fr;gap:12px}
+  .shortlist-review .button{width:100%;padding-inline:12px;font-size:14px}
+}
+@media(max-width:359px){.shortlist-intro h1{font-size:33px}.shortlist-watch h1{font-size:31px}.shortlist-preview strong{font-size:15px}.shortlist-video-pending{grid-template-columns:1fr}.shortlist-video-pending>img{height:160px;min-height:160px;object-position:center 25%}}
+
+/* On phones, the signup follows the offer directly; the guide preview is
+   supporting material and never sits between a visitor and the form. */
+@media(max-width:760px){
+  .shortlist-hero{gap:16px;padding-block:22px 34px}
+  .shortlist-intro{display:contents}
+  .shortlist-intro>.eyebrow{order:0;margin:0;font-size:11px}
+  .shortlist-intro>h1{order:1;font-size:clamp(35px,8vw,48px);margin:0}
+  .shortlist-intro>.campaign-lede{order:2;font-size:16px;line-height:1.5;margin:0}
+  .shortlist-mobile-action{order:3;margin:0}.shortlist-mobile-action p{font-size:13px;margin:8px 0}
+  .shortlist-optin{order:4;padding:20px 16px}
+  .shortlist-preview{order:5;margin:4px 0 0}
+  .shortlist-intro>.campaign-byline{order:6}
+  .shortlist-optin .shortlist-access{font-size:15px}
+  [data-shortlist] .shortlist-optin .campaign-form>fieldset>.consent,.shortlist-optin .form-note,.shortlist-resource-help{font-size:13px}
+  .shortlist-backup a{display:inline-flex;align-items:center;min-height:44px;font-size:13px}
+  .shortlist-watch .campaign-lede,.shortlist-watch-video .video-pending p{font-size:16px}
+}

@@ -32,7 +32,7 @@ function openForm({
   campaignId = 'C1', requestType = 'Home comparison', interest = 'Buying a home',
   pathname = '/compare/', thanksPath = '/thanks/compare/', query = '',
   extra = {}, responses = [Response.json({ success: true })], storageBlocked = false,
-  privacyChoice, gpc = false
+  privacyChoice, gpc = false, origin = 'https://www.evankrealestate.com'
 } = {}) {
   const fields = Object.entries({
     campaign_id: campaignId, request_type: requestType, interest, cta_source: `${campaignId} form`,
@@ -67,7 +67,7 @@ function openForm({
     querySelector() { return items.find(field => field.type !== 'hidden') || null; }
   }));
   const form = element({
-    dataset: { thanksPath, successMessage: 'Your request is on its way. Evan will reply.' },
+    dataset: { thanksPath, successMessage: 'Your request is on its way. Evan will reply.', ...(campaignId === 'C02' ? {sheetEmail:'true'} : {}) },
     elements: fields,
     appendChild(field) { fields.push(field); },
     querySelector(selector) {
@@ -106,17 +106,18 @@ function openForm({
     },
     removeItem(key) { stored.delete(key); }
   };
-  const location = new URL(`https://www.evankrealestate.com${pathname}${query}`);
+  const location = new URL(`${origin}${pathname}${query}`);
   location.assign = url => redirects.push(url);
   const fetch = async (url, options) => {
-    requests.push({ url, payload: JSON.parse(options.body) });
+    requests.push({ url, payload: options.body instanceof URLSearchParams
+      ? Object.fromEntries(options.body) : JSON.parse(options.body) });
     const response = responses.shift();
     if (response instanceof Error) throw response;
     assert.ok(response, 'unexpected extra request');
     return response;
   };
   const document = {
-    body: element(), documentElement: element(), referrer: 'https://example.test/saved?email=private',
+    body: element({ dataset: { campaignId } }), documentElement: element(), referrer: 'https://example.test/saved?email=private',
     getElementById(id) { return ids[id] || null; },
     querySelector() { return null; },
     querySelectorAll(selector) { return selector.startsWith('[data-interest]') ? [cta] : []; },
@@ -247,6 +248,34 @@ test('campaign email fallback preserves the offer fields and uses its own confir
   assert.deepEqual(page.redirects, ['https://www.evankrealestate.com/thanks/seller-plan/?submitted=1']);
 });
 
+test('an unconnected C02 email request stays on the public offer without a receipt or conversion', async () => {
+  for (const unavailable of [Response.json({ success: false, code: 'LOCAL_PREVIEW' }),
+    Response.json({ success: false, code: 'NOT_CONFIGURED' }, { status: 503 }),
+    new Response('Static preview', { status: 405 })]) {
+    const page = openForm({ origin: 'http://127.0.0.1:4173', campaignId: 'C02',
+      requestType: 'First Home Next Steps Sheet', pathname: '/first-purchase/', thanksPath: '/first-purchase/sheet-request/',
+      query: '?utm_source=instagram&name=private', privacyChoice: 'accepted', responses: [unavailable] });
+    await page.submitForm();
+    await page.submitForm();
+    assert.deepEqual(page.requests.map(r => r.url), ['/api/leads']);
+    assert.equal(page.stored.has(RECEIPT_KEY), false);
+    assert.deepEqual(page.redirects, []);
+    assert.match(page.ids.formStatus.textContent, /worksheet request was not sent/);
+    assert.ok(!page.pixelCalls().some(call => call[1] === 'Lead'));
+  }
+});
+
+test('confirmed C02 worksheet access also works when the browser blocks session storage', async () => {
+  const page = openForm({ campaignId: 'C02', requestType: 'First Home Next Steps Sheet',
+    pathname: '/first-purchase/', thanksPath: '/first-purchase/sheet-request/', storageBlocked: true });
+  await page.submitForm();
+  await page.submitForm();
+  assert.deepEqual(page.redirects, []);
+  assert.equal(page.ids.formStatus.dataset.state, 'success');
+  assert.equal(page.requests.length, 1);
+  assert.equal(page.stored.has(RECEIPT_KEY), false);
+});
+
 test('failed campaign delivery preserves answers and produces neither a receipt nor a redirect', async () => {
   const page = openForm({
     extra: { priority_one: 'Home office' },
@@ -313,4 +342,77 @@ test('a failed opted-in form submission never records a Meta Lead', async () => 
   assert.deepEqual(page.pixelCalls().filter(args => args[0] === 'track'), [['track', 'PageView']]);
   assert.equal(page.stored.has(RECEIPT_KEY), false);
   assert.equal(page.redirects.length, 0);
+});
+
+test('C01 accepted resource carries only named campaign attribution into the walkthrough', async () => {
+  const page = openForm({
+    campaignId: 'C01', requestType: 'Shortlist sheet', pathname: '/compare-homes/', thanksPath: '/compare-homes/watch/',
+    query: '?utm_source=facebook&utm_medium=paid_social&utm_campaign=c01_shortlist&utm_content=ad_a&email=private&arbitrary=hidden'
+  });
+  await page.submitForm();
+  await page.submitForm();
+  assert.equal(page.requests.length, 1);
+  const destination = new URL(page.redirects[0]);
+  assert.equal(destination.pathname, '/compare-homes/watch/');
+  assert.equal(destination.searchParams.get('utm_campaign'), 'c01_shortlist');
+  assert.equal(destination.searchParams.get('utm_content'), 'ad_a');
+  assert.equal(destination.searchParams.has('email'), false);
+  assert.equal(destination.searchParams.has('arbitrary'), false);
+  assert.equal(JSON.parse(page.stored.get(RECEIPT_KEY)).campaignId, 'C01');
+});
+
+test('C01 storage-blocked review confirmation counts a request, never a resource lead or confirmed booking', async () => {
+  const page = openForm({
+    campaignId: 'C01', requestType: 'Home Shortlist Review', pathname: '/book/home-shortlist/', thanksPath: '/thanks/home-shortlist/',
+    storageBlocked: true, privacyChoice: 'accepted'
+  });
+  await page.submitForm();
+  await page.submitForm();
+  assert.equal(page.pixelCalls().filter(args => args[1] === 'HomeShortlistReviewRequested').length, 1);
+  assert.equal(page.pixelCalls().filter(args => ['Lead', 'Schedule'].includes(args[1])).length, 0);
+  await page.submitForm();
+  assert.equal(page.requests.length, 1);
+});
+
+test('C01 review request measurement handles static index and slashless entry URLs', async () => {
+  for (const pathname of ['/book/home-shortlist', '/book/home-shortlist/index.html']) {
+    const page = openForm({ campaignId: 'C01', requestType: 'Home Shortlist Review', pathname,
+      thanksPath: '/thanks/home-shortlist/', storageBlocked: true, privacyChoice: 'accepted' });
+    await page.submitForm();
+    await page.submitForm();
+    assert.equal(page.pixelCalls().filter(args => args[1] === 'HomeShortlistReviewRequested').length, 1);
+    assert.equal(page.pixelCalls().filter(args => ['Lead', 'Schedule'].includes(args[1])).length, 0);
+  }
+});
+
+test('only an accepted C02 sheet request gets its own confirmation and preserves attribution', async () => {
+  const page = openForm({ campaignId:'C02', requestType:'First Home Next Steps Sheet', pathname:'/first-purchase/', thanksPath:'/first-purchase/sheet-request/',
+    query:'?utm_source=instagram&utm_content=guide&email=private&intent=sell', privacyChoice:'rejected',
+    responses:[Response.json({success:false},{status:502}),Response.json({success:true})] });
+  await page.submitForm();
+  await page.submitForm();
+  assert.equal(page.redirects.length,0);
+  assert.equal(page.stored.has(RECEIPT_KEY),false);
+  await page.submitForm();
+  assert.equal(page.requests.length,2);
+  assert.equal(page.requests[1].payload.campaign_id,'C02');
+  assert.equal(page.requests[1].payload.request_type,'First Home Next Steps Sheet');
+  assert.equal(page.redirects.length,0);
+  assert.equal(page.ids.formStatus.dataset.state,'success');
+  assert.equal(page.requests[1].payload.utm_source,'instagram');
+  assert.equal(page.stored.has(RECEIPT_KEY),false);
+  assert.equal(page.pixelCalls().length,0);
+});
+
+test('C02 accepted sheet emits only a resource Lead and only with tracking permission', async () => {
+  for (const [choice, gpc, count] of [['accepted',false,1],['rejected',false,0],['accepted',true,0]]) {
+    const page = openForm({ campaignId:'C02', requestType:'First Home Next Steps Sheet', pathname:'/first-purchase/',
+      thanksPath:'/first-purchase/sheet-request/', privacyChoice:choice, gpc });
+    await page.submitForm();
+    await page.submitForm();
+    await page.submitForm();
+    assert.equal(page.requests.length,1);
+    assert.equal(page.pixelCalls().filter(x=>x[1]==='Lead').length,count);
+    assert.ok(!page.pixelCalls().some(x=>x[1]==='Schedule' || x[1]==='C02BookingStarted'));
+  }
 });

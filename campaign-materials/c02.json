@@ -1,0 +1,127 @@
+{
+  "campaign": "C02 · First Home Game Plan",
+  "public_page": "https://www.evankrealestate.com/first-purchase/",
+  "paid_ad_destinations": {
+    "Facebook": "https://www.evankrealestate.com/first-purchase/?utm_source=facebook&utm_medium=paid_social&utm_campaign=c02_first_home_game_plan",
+    "Instagram": "https://www.evankrealestate.com/first-purchase/?utm_source=instagram&utm_medium=paid_social&utm_campaign=c02_first_home_game_plan"
+  },
+  "booking_entry": "https://www.evankrealestate.com/first-purchase/#booking",
+  "sheet": "https://www.evankrealestate.com/resources/first-home-next-steps-sheet.pdf",
+  "booking_cta": "Book My First Home Game Plan",
+  "use": "Hold video-promising ads until Evan’s final recording is available publicly. Use live-time language only after the calendar is connected. Keep the existing agent and brokerage disclosure overlays.",
+  "identity": {
+    "licensed_name": "Evan Karwowski",
+    "salesperson_dre": "02102429",
+    "brokerage_name": "WR Properties",
+    "brokerage_dre": "02029047",
+    "display_name": "Evan Karwowski | DRE 02102429 | WR Properties | Brokerage DRE 02029047",
+    "public_page_header": [
+      "Evan Karwowski | DRE 02102429",
+      "WR Properties | Brokerage DRE 02029047"
+    ],
+    "ad_overlay_lines": [
+      "Evan Karwowski | DRE 02102429",
+      "WR Properties | Brokerage DRE 02029047"
+    ]
+  },
+  "vsl": [
+    "You can be interested in buying a home and still have no idea what you're supposed to do next. Maybe you've saved listings for months. Maybe you've spoken with a lender and now you're wondering how the home search actually works.",
+    "The starting point changes depending on what you've already done. That's what this sheet is for.",
+    "I'm Evan Karwowski with WR Properties. I made the First Home Next Steps Sheet to help you turn the big idea of buying into a few things you can actually work on.",
+    "Start in the first section and mark what's already happened. Have you talked about a working budget? Picked areas you want to explore? Written down the features that would make a move worthwhile? You can leave anything blank that you're still figuring out.",
+    "Then choose the question that's holding things up. Suppose it's the money needed to get started. Your next action could be preparing a few specific questions for a lender about costs and the information they need. The lender answers the financing questions. The sheet helps you get ready for that conversation.",
+    "Or maybe you've already had that conversation, and now you need to decide which homes are worth seeing. In that case, defining the search criteria and understanding representation may be more useful next steps.",
+    "You can download the sheet below and fill it out yourself. If you want help putting the steps in order, book a free 20 minute First Home Game Plan session with me.",
+    "We'll start with what you've done and the question you brought. We'll choose up to three next actions, identify who can help, and agree which one comes first. Your written recap arrives within two business days after we speak.",
+    "If the next step is an active home search, we can also discuss how I'd help you as your agent, the services involved, and the representation terms. Tell me about any existing agent relationship before we begin.",
+    "You can use the sheet even if buying is still a little way off. If you’d like to work through your next steps together, choose Book My First Home Game Plan. Answer a few short questions so I can prepare for our call."
+  ],
+  "ads": [
+    {
+      "name": "The starting point",
+      "hook": "You've started looking at homes. What happens next?",
+      "script": "You've started looking at homes. What happens next? That depends on what you've already done. I've made a free short video and First Home Next Steps Sheet to help you sort that out. Mark your starting point, choose the question holding you up, and put the next actions in order. Tap Learn More to watch the video and download the sheet. If you want help applying it to your plans, you can book a free session with me.",
+      "primary": "Get the free first home video and action sheet. Start with what you've already done and work out a useful next step.",
+      "headline": "Work Out Your Next Buying Step",
+      "visual": "Start on a phone browsing mock homes. Mark a few completed items on the original action sheet."
+    },
+    {
+      "name": "The group chat",
+      "hook": "Ask five people how to buy a house. Get six answers.",
+      "script": "Ask five people how to buy a house. Get six answers. Everyone starts from a different place. My free First Home Next Steps Sheet helps you start from yours. You'll mark what you've done and turn the biggest question into an action. There's a short video to walk you through it too. Tap Learn More to watch the video and download the sheet. If you’d like help putting your steps in order, book a free call on that page.",
+      "primary": "Give all that buying advice a place to go. Free video and action sheet for your own starting point.",
+      "headline": "Make a Plan for Your First Purchase",
+      "visual": "Show fictional advice cards, then put them aside and fill in the starting point section."
+    },
+    {
+      "name": "Progress already made",
+      "hook": "Already spoke with a lender? Start there.",
+      "script": "Already spoke with a lender? Start there. Your next buying step should build on what you've already done. My free video and First Home Next Steps Sheet help you see what's complete, what's still unclear, and which action belongs next. You'll also see how a free planning session works if you'd like help. Tap Learn More to watch the video and download the sheet. You can put your plans on paper today.",
+      "primary": "Build on the buying steps you've completed. Get Evan's free video and next steps sheet.",
+      "headline": "See What Comes After Your Starting Point",
+      "visual": "Check a fictional lender conversation item, then move to the search criteria section."
+    },
+    {
+      "name": "The future buyer",
+      "hook": "Buying later still gives you something useful to do now.",
+      "script": "Buying later still gives you something useful to do now. You could narrow down the areas, write your must haves, or prepare questions for a lender. The right step depends on where you are. My free First Home Next Steps Sheet and short video help you decide. Tap Learn More to watch the video and download the sheet. You can use them at your own pace and book a free session when you'd like to work through your plans.",
+      "primary": "Thinking ahead about your first home? Use the free video and sheet to choose a practical planning step.",
+      "headline": "Start Planning at Your Own Pace",
+      "visual": "Show an undated planning calendar and write a single useful action."
+    },
+    {
+      "name": "The manageable action",
+      "hook": "Buying a home is a big project. Pick the next task.",
+      "script": "Buying a home is a big project. Pick the next task. That's easier when you can see what you've done and what still needs an answer. I made a free First Home Next Steps Sheet to help with that, plus a short walkthrough. Tap Learn More to watch the video and download the sheet. If you'd like us to build your next actions together, you can choose a free First Home Game Plan session on that same page.",
+      "primary": "Turn the buying process into next actions. Free video and planning sheet, with personal help available afterward.",
+      "headline": "Put Your Next Steps in Order",
+      "visual": "Start with a long blank checklist, then circle one action on the supplied sheet."
+    }
+  ],
+  "personal_email_replies": {
+    "sheet_request": {
+      "subject": "Your First Home Next Steps Sheet",
+      "body": "Hi [first name], here’s the sheet you requested. Download your copy here: https://www.evankrealestate.com/resources/first-home-next-steps-sheet.pdf\n\nStart with the question at the top of page one and use the page it points you to. If you’d like to talk it through, my free 20-minute call is here: https://www.evankrealestate.com/first-purchase/#booking\n\nEvan"
+    },
+    "manual_time_request": {
+      "subject": "A time for your First Home Game Plan",
+      "body": "Hi [first name], we’re set for [date, time and time zone]. I’ll call the number you provided from 925-492-7023. We’ll have 20 minutes to work through your questions. If another time would work better, just reply here.\n\nEvan"
+    },
+    "after_call": {
+      "subject": "Your first home next steps",
+      "body": "Hi [first name], here’s the recap from our call. Your starting point was [starting point]. We agreed to start with [first action and who can help], then [remaining actions and who can help]. [Follow-up we agreed on]. Evan"
+    }
+  },
+  "recording_pickups": [
+    {
+      "creative": "The starting point",
+      "replace": "Tap Learn More and I'll send both.",
+      "with": "Tap Learn More to watch the video and download the sheet."
+    },
+    {
+      "creative": "The group chat",
+      "replace": "Tap Learn More to get both, then choose a free planning session if you'd like help putting your next steps in order.",
+      "with": "Tap Learn More to watch the video and download the sheet. If you’d like help putting your steps in order, book a free call on that page."
+    },
+    {
+      "creative": "Progress already made",
+      "replace": "Tap Learn More and I'll send you the video and sheet so you can put your plans on paper.",
+      "with": "Tap Learn More to watch the video and download the sheet. You can put your plans on paper today."
+    },
+    {
+      "creative": "The future buyer",
+      "replace": "Tap Learn More to get both.",
+      "with": "Tap Learn More to watch the video and download the sheet."
+    },
+    {
+      "creative": "The manageable action",
+      "replace": "Tap Learn More and I'll send them. If you'd like us to build your next actions together, you can choose a free First Home Game Plan session on the next page.",
+      "with": "Tap Learn More to watch the video and download the sheet. If you'd like us to build your next actions together, you can choose a free First Home Game Plan session on that same page."
+    },
+    {
+      "creative": "VSL closing",
+      "replace": "You can use the sheet even if buying is still a little way off. And if you're ready to work out your next steps together, click Plan My Next Buying Steps and choose a time.",
+      "with": "You can use the sheet even if buying is still a little way off. If you’d like to work through your next steps together, choose Book My First Home Game Plan. Answer a few short questions so I can prepare for our call."
+    }
+  ]
+}

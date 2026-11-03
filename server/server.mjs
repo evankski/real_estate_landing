@@ -8,13 +8,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { handleLead } from './lead-handler.mjs';
 import { resolvePublicFile } from './public-files.mjs';
 import { publicPathFromUrl } from './public-paths.mjs';
+import { firstHomeRedirect, worksheetCampaigns } from './worksheet-campaigns.mjs';
 export { publicPathFromUrl } from './public-paths.mjs';
 
 export const SITE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
-  '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
+  '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.pdf': 'application/pdf',
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.vtt': 'text/vtt; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml; charset=utf-8'
 };
@@ -57,6 +58,9 @@ export async function serveAsset(rawUrl, method = 'GET', root = SITE_ROOT, reque
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'no-cache'
     });
+    if ('/' + relativePath === worksheetCampaigns.C02.pdf) {
+      headers.set('Content-Disposition', `inline; filename="${worksheetCampaigns.C02.downloadName}"`);
+    }
     const requested = new Headers(requestHeaders);
     // HEAD ignores Range. No strong validator is issued by this development
     // server, so If-Range cannot match and gets the complete representation.
@@ -97,7 +101,8 @@ export function createSiteServer(env = process.env) {
         }
         response = await handleLead(new Request(url, init), env);
       } else {
-        response = await serveAsset(rawUrl, incoming.method, SITE_ROOT, incoming.headers);
+        response = (['GET','HEAD'].includes(incoming.method) && firstHomeRedirect(rawUrl))
+          || await serveAsset(rawUrl, incoming.method, SITE_ROOT, incoming.headers);
       }
       outgoing.writeHead(response.status, Object.fromEntries(response.headers));
       if (response.body) await pipeline(Readable.fromWeb(response.body), outgoing);

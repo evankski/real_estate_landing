@@ -156,6 +156,18 @@ test('production fresh visitors load no pixel until they explicitly allow tracki
   assert.equal(page.calls().filter(args => args[1] === 'PageView').length, 1);
 });
 
+test('only a loopback preview displays the testing notice, and it never records a Lead', () => {
+  const path = '/first-purchase/watch/';
+  const preview = openPage({href: 'http://127.0.0.1:4173' + path + '?preview=1', thanks: true,
+    campaignId: 'C02', choice: 'accepted'});
+  assert.match(preview.ids.thanksMessage.textContent, /Local preview only/);
+  assert.equal(preview.leadCount(), 0);
+  const live = openPage({href: 'https://www.evankrealestate.com' + path + '?preview=1', thanks: true,
+    campaignId: 'C02', choice: 'accepted'});
+  assert.doesNotMatch(live.ids.thanksMessage.textContent, /Local preview/);
+  assert.equal(live.leadCount(), 0);
+});
+
 test('production disables automatic configuration before Pixel initialization', () => {
   const page = openPage({ choice: 'accepted' });
   const calls = page.calls();
@@ -532,3 +544,26 @@ test('arbitrary visitor query fields alone never rewrite links', () => {
   });
   assert.deepEqual(page.anchors.map(anchor => anchor.getAttribute('href')), links);
 });
+
+for (const [id, path, event, method] of [
+  ['C01', '/compare-homes/watch/', 'Lead', 'track'],
+  ['C01', '/thanks/home-shortlist/', 'HomeShortlistReviewRequested', 'trackCustom'],
+  ['C02', '/first-purchase/', 'Lead', 'track']
+]) {
+  test(`${id} ${path} records only its accepted event once and honors consent`, () => {
+    const receipt = { status: 'accepted', acceptedAt: NOW - 1000, thanksPath: path, campaignId: id };
+    const base = { thanks: true, campaignId: id, href: `https://www.evankrealestate.com${path}`, search: '?submitted=1', receipt };
+    const page = openPage({ ...base, choice: 'accepted' });
+    const events = page.calls().filter(args => args[0] === method && args[1] === event);
+    assert.equal(events.length, 1);
+    assert.ok(JSON.stringify(events[0]).includes(id));
+    assert.equal(page.calls().some(args => args[1] === 'Schedule'), false);
+    if (event !== 'Lead') assert.equal(page.leadCount(), 0);
+    const revisited = openPage({ ...base, choice: 'accepted', sessionStorage: page.sessionStorage });
+    assert.equal(revisited.calls().filter(args => args[1] === event).length, 0);
+    for (const overrides of [{ choice: 'rejected' }, { choice: 'accepted', gpc: true }, { choice: 'accepted', receipt: null }, { choice: 'accepted', receipt: { ...receipt, campaignId: id === 'C02' ? 'C2' : 'C1' } }]) {
+      const blocked = openPage({ ...base, ...overrides });
+      assert.equal(blocked.calls().filter(args => args[1] === event).length, 0);
+    }
+  });
+}

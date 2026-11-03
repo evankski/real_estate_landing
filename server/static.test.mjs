@@ -6,12 +6,12 @@ import { dirname, join } from 'node:path';
 import { Writable } from 'node:stream';
 import { once } from 'node:events';
 import { publicPathFromUrl, serveAsset, createSiteServer, SITE_ROOT } from './server.mjs';
-import { listPublicFiles, PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES } from './public-files.mjs';
+import { listPublicFiles, PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, PUBLIC_RESOURCE_FILES } from './public-files.mjs';
 
 async function publicFixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'evan-public-fixture-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  for (const filename of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES]) {
+  for (const filename of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES, ...PUBLIC_RESOURCE_FILES]) {
     await mkdir(dirname(join(root, filename)), { recursive: true });
     await writeFile(join(root, filename), filename);
   }
@@ -280,4 +280,16 @@ test('build manifest excludes source, credentials, documentation, and old pages'
   assert.ok(files.includes('resources/buyer-checklist/index.html'));
   assert.ok(files.every(file => !/^(old|server|scripts|dist|\.)\//.test(file)));
   assert.ok(files.every(file => !/\.(?:md|json|jsonc|mjs)$/.test(file)));
+});
+
+test('C01 public worksheet is served as a PDF and private or unapproved resources stay inaccessible', async () => {
+  const response = await serveAsset('/resources/3-home-shortlist-sheet.pdf');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Content-Type'), 'application/pdf');
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
+  assert.ok((await listPublicFiles(SITE_ROOT)).includes('resources/3-home-shortlist-sheet.pdf'));
+  for (const path of ['/resources/private.pdf', '/scripts/shortlist-config.mjs', '/scripts/generate-shortlist.mjs']) {
+    assert.equal((await serveAsset(path)).status, 404);
+  }
 });

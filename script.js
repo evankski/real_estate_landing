@@ -65,6 +65,7 @@
   const privacyStatus = document.getElementById('privacyStatus');
   const consentKey = 'ek_cookie_tracking_choice_v3';
   const leadReceiptKey = 'ek_lead_receipt';
+  const isLocalPreviewHost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
   let cookieReturnFocus = null;
   let confirmedLead = false;
   let leadTracked = false;
@@ -87,7 +88,12 @@
       confirmedLead = false;
     }
 
-    if (confirmedLead) {
+    const preview = isLocalPreviewHost && new URLSearchParams(window.location.search).get('preview') === '1';
+    if (preview) {
+      confirmedLead = false;
+      const message = document.getElementById('thanksMessage');
+      if (message) message.textContent = 'Local preview only. Nothing was sent to Evan, no appointment was requested, and no lead was recorded.';
+    } else if (confirmedLead) {
       const thanksTitle = document.getElementById('thanksTitle');
       const thanksMessage = document.getElementById('thanksMessage');
       if (thanksTitle) thanksTitle.textContent = document.body.dataset.confirmedTitle || 'Your inquiry is on its way.';
@@ -208,12 +214,30 @@
     window.fbq('track', 'PageView');
   }
 
+  const worksheetEvents = {
+    C01: { resourcePaths: ['/compare-homes/', '/compare-homes/watch/'], sessionPaths: ['/book/home-shortlist/', '/thanks/home-shortlist/'], resource: '3 Home Shortlist Sheet', session: 'HomeShortlistReviewRequested' },
+    C02: { resourcePaths: ['/first-purchase/'], sessionPaths: [], resource: 'First Home Next Steps Sheet' }
+  };
+
   function trackConfirmedLead() {
     if (!CONFIG.metaPixelEnabled || !confirmedLead || leadTracked || browserSendsOptOutSignal() || getStoredChoice() !== 'accepted') return;
     try {
       loadMetaPixel(CONFIG.metaPixelId);
       if (window.fbq) {
-        window.fbq('track', 'Lead');
+        // Only fixed campaign context reaches Meta. A time request is not a
+        // booking, and must not count as another resource Lead or a Schedule.
+        const path = window.location.pathname.replace(/\/index\.html$/, '/').replace(/\/?$/, '/');
+        const id = document.body.dataset.campaignId;
+        const offer = worksheetEvents[id];
+        if (offer?.sessionPaths.includes(path)) {
+          window.fbq('trackCustom', offer.session, { campaign_id: id });
+        } else if (offer?.resourcePaths.includes(path)) {
+          window.fbq('track', 'Lead', { content_name: offer.resource, content_category: id });
+        } else if (offer) {
+          return;
+        } else {
+          window.fbq('track', 'Lead');
+        }
         leadTracked = true;
       }
     } catch (error) {
@@ -461,15 +485,32 @@
       }
     }
 
-    function acceptSubmission() {
-      submissionSucceeded = true;
+    function nextPageUrl(marker) {
       const destination = new URL(form.dataset.thanksPath || './thanks.html', window.location.href);
       // Only a local, plain path may be used as a confirmation destination.
       const configuredPathIsSafe = destination.origin === window.location.origin
         && ['http:', 'https:'].includes(destination.protocol)
         && !destination.search && !destination.hash;
       const thanksUrl = configuredPathIsSafe ? destination : new URL('./thanks.html', window.location.href);
-      thanksUrl.searchParams.set('submitted', '1');
+      thanksUrl.searchParams.set(marker, '1');
+      // Preserve this funnel's ad attribution into the optional review request.
+      // Never carry form answers or arbitrary query parameters across pages.
+      if (Object.hasOwn(worksheetEvents, campaignId)) {
+        campaignEntries.forEach(([key, value]) => thanksUrl.searchParams.set(key, value));
+      }
+      return thanksUrl;
+    }
+
+    function acceptSubmission() {
+      submissionSucceeded = true;
+      if (form.dataset.sheetEmail) {
+        confirmedLead = true;
+        trackConfirmedLead();
+        setStatus(form.dataset.successMessage, 'success');
+        resetFormSubmitState();
+        return;
+      }
+      const thanksUrl = nextPageUrl('submitted');
       // Only a service-accepted response can create this short-lived receipt.
       // Only the destination and fixed offer ID accompany its timestamp; no
       // contact details, preferences, or advertising attribution are stored.
@@ -480,18 +521,21 @@
           thanksPath: thanksUrl.pathname,
           campaignId
         }));
-        window.location.assign(thanksUrl.href);
       } catch (error) {
-        // Private browsing may block storage. Keep a useful confirmation here.
+        // Without storage the next page stays neutral. The visitor still gets the worksheet.
         confirmedLead = true;
         trackConfirmedLead();
-        setStatus(form.dataset.successMessage
-          || 'Your inquiry is on its way. Evan will get back to you using your preferred contact method.', 'success');
-        resetFormSubmitState();
+        if (!worksheetEvents[campaignId]?.resourcePaths.includes(thanksUrl.pathname)) {
+          setStatus(form.dataset.successMessage
+            || 'Your inquiry is on its way. Evan will get back to you using your preferred contact method.', 'success');
+          resetFormSubmitState();
+          return;
+        }
       }
+      window.location.assign(thanksUrl.href);
     }
 
-    async function sendInquiry(payload, signal) {
+    async function sendInquiry(payload, signal, intakeUrl) {
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -500,6 +544,35 @@
         credentials: 'omit',
         referrerPolicy: 'origin'
       };
+      if (payload.campaign_id === 'C02' && payload.request_type === 'First Home Game Plan time request') {
+        // This endpoint deduplicates the appointment. Replaying the exact body
+        // is safe if the response was lost after the server committed it.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const controller = new AbortController();
+          const abort = () => controller.abort();
+          if (signal?.aborted) throw Object.assign(new Error('Request interrupted'), {retryable:true});
+          signal?.addEventListener('abort', abort, {once:true});
+          const timer = setTimeout(abort, 4500);
+          let retryable = true;
+          try {
+            const response = await fetch((!isLocalPreviewHost && intakeUrl) || '/api/leads', {...options, signal:controller.signal});
+            retryable = response.status >= 500 || [408,429].includes(response.status);
+            if (isLocalPreviewHost && [404,405].includes(response.status)) return 'preview';
+            const result = await response.json();
+            if (isLocalPreviewHost && response.ok && result.code === 'LOCAL_PREVIEW' && result.success === false) return 'preview';
+            if (response.status === 202 && result.success === true && result.delivery?.email === 'queued') return 'accepted';
+            throw new Error('Request not acknowledged');
+          } catch (error) {
+            if (!retryable || attempt === 2 || signal?.aborted) {
+              throw Object.assign(new Error('Request not acknowledged'), {retryable});
+            }
+          } finally {
+            clearTimeout(timer);
+            signal?.removeEventListener('abort', abort);
+          }
+          await new Promise(resolve => setTimeout(resolve, 350 * 2 ** attempt));
+        }
+      }
       let response = await fetch('/api/leads', options);
       let result = null;
       try {
@@ -509,18 +582,30 @@
       }
       // These responses establish that the API has not sent the inquiry. Other
       // failures may be ambiguous, so never resubmit automatically after them.
-      const useEmailFallback = response.status === 404 || response.status === 405
+      const noDeliveryApi = response.status === 404 || response.status === 405
         || (response.status === 503 && result?.code === 'NOT_CONFIGURED');
-      if (useEmailFallback) {
-        response = await fetch('https://formsubmit.co/ajax/evan@thewowski.com', options);
+      if (isLocalPreviewHost && (noDeliveryApi || (response.ok && result?.code === 'LOCAL_PREVIEW' && result.success === false))) {
+        // A static localhost or an older unconfigured preview server must not email test data.
+        return 'preview';
+      }
+      if (noDeliveryApi) {
+        // Static hosts cannot relay this request. Form encoding avoids a cross-origin
+        // OPTIONS preflight; the provider must still explicitly acknowledge the POST.
+        response = await fetch('https://formsubmit.co/ajax/evan@thewowski.com', {
+          ...options, headers: { Accept: 'application/json' }, body: new URLSearchParams(payload)
+        });
         result = await response.json();
       }
       if (!response.ok || (result?.success !== true && result?.success !== 'true')) {
         throw new Error('The inquiry service did not confirm the inquiry.');
       }
+      return 'accepted';
     }
 
     captureAttribution();
+    if (isLocalPreviewHost && !form.dataset.sheetEmail) {
+      setStatus('Local test: use sample details. Without a Follow Up Boss key, this opens the next page without sending an inquiry. With a key, it sends a real inquiry.');
+    }
     updatePhoneRequirement();
     if (contactMethod) contactMethod.addEventListener('change', updatePhoneRequirement);
     if (meetingFormat) meetingFormat.addEventListener('change', updatePhoneRequirement);
@@ -585,6 +670,10 @@
       hiddenValue('submitted_at', new Date().toISOString());
       updateCookieField(browserSendsOptOutSignal() ? 'rejected' : getStoredChoice());
       if (!window.fetch || !window.AbortController) {
+        if (isLocalPreviewHost) {
+          setStatus('Use a current browser to test this form locally. Nothing was sent.', 'error');
+          return;
+        }
         // The native HTML action remains available in older browsers. No receipt
         // is created because a redirect does not establish a successful send.
         HTMLFormElement.prototype.submit.call(form);
@@ -604,8 +693,16 @@
       const timeout = window.setTimeout(() => controller.abort(), 20000);
       try {
         const payload = Object.fromEntries(new FormData(form).entries());
-        await sendInquiry(payload, controller.signal);
-        acceptSubmission();
+        if (await sendInquiry(payload, controller.signal) === 'preview') {
+          if (form.dataset.sheetEmail) {
+            setStatus('Local preview. Your worksheet request was not sent. You can download the PDF above.', 'preview');
+            resetFormSubmitState();
+          } else {
+            window.location.assign(nextPageUrl('preview').href);
+          }
+        } else {
+          acceptSubmission();
+        }
       } catch (error) {
         setStatus(
           error.name === 'AbortError'
@@ -618,6 +715,23 @@
         window.clearTimeout(timeout);
       }
     });
+    if (form.dataset.sheetEmail && window.initFirstHomeBooking) {
+      const measure = (name) => {
+        if (!CONFIG.metaPixelEnabled || browserSendsOptOutSignal() || getStoredChoice() !== 'accepted') return;
+        try {
+          loadMetaPixel(CONFIG.metaPixelId);
+          window.fbq(name === 'Schedule' ? 'track' : 'trackCustom', name, {campaign_id: 'C02'});
+        } catch { /* Measurement is optional. */ }
+      };
+      window.initFirstHomeBooking({sendInquiry, measure, context: () => ({
+        ...Object.fromEntries(campaignEntries),
+        consent_version: form.elements.namedItem('consent_version').value,
+        consent_text: form.elements.namedItem('consent_text').value,
+        cookie_choice: browserSendsOptOutSignal() ? 'rejected' : getStoredChoice() || 'not selected',
+        landing_page: window.location.pathname,
+        referrer_origin: form.elements.namedItem('referrer_origin')?.value || ''
+      })});
+    }
   }
 
   const revealElements = document.querySelectorAll('.reveal');

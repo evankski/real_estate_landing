@@ -18,6 +18,12 @@ test('worker rewrites campaign directory URLs to explicit asset indexes and pres
       const response = await worker.fetch(new Request(`${origin}${route}${suffix}?utm_source=example`, {
         method: 'HEAD', headers: { 'Accept': 'text/html', 'Range': 'bytes=0-99' }
       }), env);
+      if (['/first-purchase/watch', '/book/first-home-plan', '/thanks/first-home-plan'].includes(route)) {
+        const hash = route === '/first-purchase/watch' ? '' : '#booking';
+        assert.equal(response.status, 302);
+        assert.equal(response.headers.get('Location'), '/first-purchase/?utm_source=example' + hash);
+        continue;
+      }
       assert.equal(response.status, 200, `${route}${suffix}`);
       const forwarded = received.at(-1);
       assert.equal(forwarded.url, `${origin}/${filename}?utm_source=example`);

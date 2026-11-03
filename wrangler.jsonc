@@ -10,6 +10,8 @@
     "run_worker_first": [
       "/", "/api/leads",
       "/compare", "/compare/*",
+      "/compare-homes", "/compare-homes/*",
+      "/first-purchase", "/first-purchase/*",
       "/buyer-plan", "/buyer-plan/*",
       "/seller-plan", "/seller-plan/*",
       "/open-house", "/open-house/*",
@@ -18,7 +20,23 @@
       "/resources/*"
     ]
   },
+  "durable_objects": {
+    "bindings": [{"name":"C02_OUTBOX","class_name":"C02AppointmentOutbox"}]
+  },
+  "migrations": [{"tag":"v1-c02-outbox","new_sqlite_classes":["C02AppointmentOutbox"]}],
+  "env": {
+    "mailtest": {
+      "workers_dev": false,
+      "durable_objects": {"bindings":[{"name":"C02_OUTBOX","class_name":"C02AppointmentOutbox"}]},
+      "send_email": [{"name":"BOOKING_EMAIL","destination_address":"evan@thewowski.com"}],
+      "vars": {"FUB_SYSTEM":"EvanKarwowskiWebsite"}
+    }
+  },
+  "observability": {"enabled":true},
   "vars": {
-    "FUB_SYSTEM": "EvanKarwowskiWebsite"
+    "FUB_SYSTEM": "EvanKarwowskiWebsite",
+    "C02_MAIL_PROVIDER": "microsoft",
+    "C02_MS_CLIENT_ID": "05985af6-cf25-47c3-b126-b7f3d89e86d6",
+    "C02_MS_TENANT_ID": "63ffce29-0c92-4761-a1aa-b750f1e86faa"
   }
 }

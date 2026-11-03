@@ -14,6 +14,10 @@ export const site = {
   address: '613 1st Street, Suite 211, Brentwood, CA 94513',
 };
 
+// For static hosting on the custom domain, set this to the deployed Worker's
+// HTTPS /api/leads URL. Empty means the API is served on the site's own origin.
+export const firstHomeIntakeUrl = 'https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads';
+
 export const campaigns = {
   compare: {
     id: 'C1',
@@ -268,6 +272,10 @@ const sampleVideo = {
 };
 
 export const videos = {
+  // New C01 Home Shortlist Review. Add Evan's recording, poster, captions and
+  // accurate transcript here using the same local media schema as other offers.
+  'home-shortlist': null,
+  'first-home-plan': { ...sampleVideo },
   compare: { ...sampleVideo },
   'buyer-plan': { ...sampleVideo },
   'seller-plan': { ...sampleVideo },
@@ -278,6 +286,7 @@ export const videos = {
 // Evan has not supplied a booking provider. Until a real URL is configured,
 // pages should offer a call request and explain that the time is confirmed later.
 export const bookingLinks = {
+  'first-home-plan': null, // Only set to Evan's verified, free 20-minute Calendly event.
   compare: null,
   'buyer-plan': null,
   'seller-plan': null,

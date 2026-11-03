@@ -1,7 +1,7 @@
 import { lstat, readdir, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
-import { PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, isPublicPath, isPropertySlug } from './public-paths.mjs';
-export { PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, isPublicPath } from './public-paths.mjs';
+import { PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, PUBLIC_RESOURCE_FILES, isPublicPath, isPropertySlug } from './public-paths.mjs';
+export { PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, PUBLIC_RESOURCE_FILES, isPublicPath } from './public-paths.mjs';
 
 // Check every component, not only the leaf: an in-root symlink could otherwise
 // make a permitted URL expose a private directory or file.
@@ -32,7 +32,7 @@ export async function resolvePublicFile(root, relativePath) {
 
 export async function listPublicFiles(root) {
   const files = [];
-  for (const name of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES]) {
+  for (const name of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES, ...PUBLIC_RESOURCE_FILES]) {
     if (!await resolvePublicFile(root, name)) throw new Error(`Required public asset is missing: ${name}`);
     files.push(name);
   }

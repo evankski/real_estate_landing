@@ -1,9 +1,10 @@
+import { worksheetCampaigns } from './worksheet-campaigns.mjs';
 // Pure route definitions shared by the Node preview and Cloudflare Worker.
 // Keep filesystem checks in public-files.mjs so the Worker has no Node imports.
 export const PUBLIC_ROOT_FILES = Object.freeze([
   'index.html', 'privacy.html', 'terms.html', 'cookies.html',
   'accessibility.html', 'thanks.html', 'style.css', 'script.js',
-  'campaigns.css', 'campaigns.js',
+  'campaigns.css', 'campaigns.js', 'shortlist.css',
   'favicon.svg', 'robots.txt', 'sitemap.xml',
   'headshot.jpg', 'headshot-480.jpg', 'headshot-960.jpg'
 ]);
@@ -15,8 +16,12 @@ export const PUBLIC_CAMPAIGN_FILES = Object.freeze([
   'thanks/seller-plan/index.html', 'thanks/open-house/index.html',
   'thanks/booking/index.html',
   'book/compare/index.html', 'book/buyer-plan/index.html', 'book/seller-plan/index.html',
-  'preferences/index.html', 'resources/buyer-checklist/index.html'
+  'preferences/index.html', 'resources/buyer-checklist/index.html',
+  worksheetCampaigns.C02.sheetThanks.slice(1) + 'index.html',
+  ...Object.values(worksheetCampaigns).flatMap(c => [c.route, c.watch, c.book, c.thanks].map(path => `${path.slice(1)}index.html`))
 ]);
+
+export const PUBLIC_RESOURCE_FILES = Object.freeze(Object.values(worksheetCampaigns).map(c => c.pdf.slice(1)));
 
 const PROPERTY_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CAMPAIGN_MEDIA = /^media\/campaigns\/[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.(?:mp4|webm|vtt|jpg|png|webp)$/;
@@ -26,7 +31,7 @@ export function isPropertySlug(value) {
 }
 
 export function isPublicPath(relativePath) {
-  if (PUBLIC_ROOT_FILES.includes(relativePath) || PUBLIC_CAMPAIGN_FILES.includes(relativePath)) return true;
+  if (PUBLIC_ROOT_FILES.includes(relativePath) || PUBLIC_CAMPAIGN_FILES.includes(relativePath) || PUBLIC_RESOURCE_FILES.includes(relativePath)) return true;
   if (/^areas\/[a-z0-9-]+\.html$/.test(relativePath) || CAMPAIGN_MEDIA.test(relativePath)) return true;
   const property = /^open-house\/([^/]+)\/index\.html$/.exec(relativePath);
   return Boolean(property && isPropertySlug(property[1]));
