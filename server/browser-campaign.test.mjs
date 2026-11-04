@@ -34,7 +34,8 @@ function openForm({
   campaignId = 'C1', requestType = 'Home comparison', interest = 'Buying a home',
   pathname = '/compare/', thanksPath = '/thanks/compare/', query = '',
   extra = {}, responses = [receipt()], storageBlocked = false,
-  privacyChoice, gpc = false, origin = 'https://www.evankrealestate.com'
+  privacyChoice, gpc = false, origin = 'https://www.evankrealestate.com',
+  referrer = 'https://example.test/saved?email=private'
 } = {}) {
   const fields = Object.entries({
     campaign_id: campaignId, request_type: requestType, interest, cta_source: `${campaignId} form`,
@@ -55,7 +56,7 @@ function openForm({
     }
   }
   const area = fields.namedItem('area');
-  area.options = ['Brentwood', 'Oakley', 'Somewhere else'].map(value => ({ value, textContent: value }));
+  area.options = ['Brentwood', 'Oakley', 'Walnut Creek', 'Somewhere else'].map(value => ({ value, textContent: value }));
   const next = element();
   const back = element();
   const submit = element({ textContent: 'Request my comparison' });
@@ -120,7 +121,7 @@ function openForm({
     return response;
   };
   const document = {
-    body: element({ dataset: { campaignId } }), documentElement: element(), referrer: 'https://example.test/saved?email=private',
+    body: element({ dataset: { campaignId } }), documentElement: element(), referrer,
     getElementById(id) { return ids[id] || null; },
     querySelector() { return null; },
     querySelectorAll(selector) { return selector.startsWith('[data-interest]') ? [cta] : []; },
@@ -232,6 +233,25 @@ test('homepage query and CTA selection still update its general inquiry and orig
   assert.equal(page.requests[0].payload.request_type, 'Home comparison');
   assert.deepEqual(page.redirects, ['https://www.evankrealestate.com/thanks.html?submitted=1']);
   assert.equal(JSON.parse(page.stored.get(RECEIPT_KEY)).campaignId, '');
+});
+
+test('guide inquiries retain the buyer or seller choice and the known page name without recording a private referrer URL', async () => {
+  const origin = 'https://evankrealestate.com';
+  for (const [path, expected] of [
+    [origin + '/areas/walnut-creek-ca-real-estate.html', 'Area guide: Walnut Creek'],
+    [origin + '/guides/compare-brentwood-homes/', 'Guide: Brentwood property tax comparison'],
+    ['https://example.test/areas/walnut-creek-ca-real-estate.html', 'Campaign URL']
+  ]) {
+    const page = openForm({campaignId:'', origin, pathname:'/', query:'?intent=sell&area=Walnut+Creek',
+      referrer:path + '?private=never-copy-this'});
+    page.next.emit('click');
+    await page.submitForm();
+    const {payload} = page.requests[0];
+    assert.equal(payload.cta_source, expected);
+    assert.equal(payload.area, 'Walnut Creek');
+    assert.equal(payload.interest, 'Selling a home');
+    assert.ok(!JSON.stringify(payload).includes('never-copy-this'));
+  }
 });
 
 test('campaign retry through the same Worker preserves the offer fields and uses its own confirmation route', async () => {

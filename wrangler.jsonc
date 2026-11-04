@@ -8,7 +8,9 @@
     "binding": "ASSETS",
     "html_handling": "none",
     "run_worker_first": [
-      "/", "/api/leads",
+      "/", "/index.html", "/api/leads",
+      "/areas", "/areas/*", "/guides/*",
+      "/privacy.html", "/terms.html", "/cookies.html", "/accessibility.html",
       "/compare", "/compare/*",
       "/compare-homes", "/compare-homes/*",
       "/first-purchase", "/first-purchase/*",

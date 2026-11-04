@@ -22,6 +22,7 @@ export const PUBLIC_CAMPAIGN_FILES = Object.freeze([
 ]);
 
 export const PUBLIC_RESOURCE_FILES = Object.freeze(Object.values(worksheetCampaigns).map(c => c.pdf.slice(1)));
+export const PUBLIC_GUIDE_FILES = Object.freeze(['guides/compare-brentwood-homes/index.html']);
 
 const PROPERTY_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CAMPAIGN_MEDIA = /^media\/campaigns\/[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.(?:mp4|webm|vtt|jpg|png|webp)$/;
@@ -31,7 +32,7 @@ export function isPropertySlug(value) {
 }
 
 export function isPublicPath(relativePath) {
-  if (PUBLIC_ROOT_FILES.includes(relativePath) || PUBLIC_CAMPAIGN_FILES.includes(relativePath) || PUBLIC_RESOURCE_FILES.includes(relativePath)) return true;
+  if (PUBLIC_ROOT_FILES.includes(relativePath) || PUBLIC_CAMPAIGN_FILES.includes(relativePath) || PUBLIC_RESOURCE_FILES.includes(relativePath) || PUBLIC_GUIDE_FILES.includes(relativePath)) return true;
   if (/^areas\/[a-z0-9-]+\.html$/.test(relativePath) || CAMPAIGN_MEDIA.test(relativePath)) return true;
   const property = /^open-house\/([^/]+)\/index\.html$/.exec(relativePath);
   return Boolean(property && isPropertySlug(property[1]));

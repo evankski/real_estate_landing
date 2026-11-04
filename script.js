@@ -599,6 +599,22 @@
       selectIntent(pageIntent);
       if (ctaSource) ctaSource.value = query.has('intent') ? 'Campaign URL' : 'Campaign page';
     }
+    // Record the guide that led to a homepage inquiry, whether or not the
+    // visitor allows advertising. Never copy a referrer query or a listing URL.
+    if (!campaignId && ctaSource && document.referrer) {
+      try {
+        const from = new URL(document.referrer);
+        if (from.origin === window.location.origin) {
+          const guides = ['Brentwood', 'Discovery Bay', 'Livermore', 'Oakley', 'Pleasanton',
+            'Walnut Creek', 'Benicia', 'Concord', 'Danville', 'Dublin', 'Pleasant Hill', 'San Ramon', 'Vallejo'];
+          const city = guides.find(name =>
+            from.pathname === '/areas/' + name.toLowerCase().replaceAll(' ', '-') + '-ca-real-estate.html');
+          if (city) ctaSource.value = 'Area guide: ' + city;
+          else if (from.pathname === '/areas/') ctaSource.value = 'Area guide directory';
+          else if (from.pathname === '/guides/compare-brentwood-homes/') ctaSource.value = 'Guide: Brentwood property tax comparison';
+        }
+      } catch { /* A missing or invalid referrer does not affect the inquiry. */ }
+    }
     selectArea(query.get('area'));
 
     // The unenhanced form remains a conventional form with all fields visible.

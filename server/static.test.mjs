@@ -7,12 +7,12 @@ import { dirname, join } from 'node:path';
 import { Writable } from 'node:stream';
 import { once } from 'node:events';
 import { publicPathFromUrl, serveAsset, createSiteServer, SITE_ROOT } from './server.mjs';
-import { listPublicFiles, PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, PUBLIC_RESOURCE_FILES } from './public-files.mjs';
+import { listPublicFiles, PUBLIC_ROOT_FILES, PUBLIC_CAMPAIGN_FILES, PUBLIC_RESOURCE_FILES, PUBLIC_GUIDE_FILES } from './public-files.mjs';
 
 async function publicFixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'evan-public-fixture-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  for (const filename of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES, ...PUBLIC_RESOURCE_FILES]) {
+  for (const filename of [...PUBLIC_ROOT_FILES, ...PUBLIC_CAMPAIGN_FILES, ...PUBLIC_RESOURCE_FILES, ...PUBLIC_GUIDE_FILES]) {
     await mkdir(dirname(join(root, filename)), { recursive: true });
     await writeFile(join(root, filename), filename);
   }
@@ -24,6 +24,8 @@ test('only published assets can be requested; private and traversal paths fail c
   assert.equal(publicPathFromUrl('/'), 'index.html');
   assert.equal(publicPathFromUrl('/style.css?v=1'), 'style.css');
   assert.equal(publicPathFromUrl('/areas/brentwood-ca-real-estate.html'), 'areas/brentwood-ca-real-estate.html');
+  assert.equal(publicPathFromUrl('/areas/'), 'areas/index.html');
+  assert.equal(publicPathFromUrl('/guides/compare-brentwood-homes/'), 'guides/compare-brentwood-homes/index.html');
   for (const path of [
     '/.env', '/.env.example', '/.git/config', '/server/lead-handler.mjs',
     '/package.json', '/README-FIRST.md', '/old/index.html', '/wrangler.jsonc',
@@ -277,6 +279,8 @@ test('build manifest excludes source, credentials, documentation, and old pages'
   const files = await listPublicFiles(SITE_ROOT);
   assert.ok(files.includes('index.html'));
   assert.ok(files.includes('areas/brentwood-ca-real-estate.html'));
+  assert.ok(files.includes('areas/index.html'));
+  assert.ok(files.includes('guides/compare-brentwood-homes/index.html'));
   assert.ok(files.includes('headshot.jpg'));
   assert.ok(files.includes('compare/index.html'));
   assert.ok(files.includes('resources/buyer-checklist/index.html'));

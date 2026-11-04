@@ -1,4 +1,3 @@
 User-agent: *
 Allow: /
-Disallow: /old/
-Sitemap: https://www.evankrealestate.com/sitemap.xml
+Sitemap: https://evankrealestate.com/sitemap.xml

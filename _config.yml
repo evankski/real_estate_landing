@@ -1,0 +1,21 @@
+# GitHub Pages builds from this repository's root. Publish the website, while
+# keeping working documents and backend source out of the public Pages build.
+url: "https://evankrealestate.com"
+exclude:
+  - server/
+  - scripts/
+  - campaign-materials/
+  - dist/
+  - node_modules/
+  - vendor/
+  - package.json
+  - wrangler.jsonc
+  - README-FIRST.md
+  - CAMPAIGN-01.md
+  - CAMPAIGN-02.md
+  - CAMPAIGN-PAGES.md
+  - LOCAL-SEO-AUDIT.md
+  - launch-checklist.md
+  - facebook-pixel-setup.md
+  - photo-shot-list.md
+  - old/README.md

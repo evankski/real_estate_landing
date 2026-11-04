@@ -21,7 +21,7 @@ const PUBLIC_ORIGINS = new Set([
 
 export const LEAD_OPTIONS = Object.freeze({
   interest: ['Buying a home', 'Selling a home', 'Buying and selling', 'Exploring my options'],
-  area: ['Brentwood', 'Oakley', 'Livermore', 'Pleasanton', 'Discovery Bay', 'More than one area', 'Somewhere else'],
+  area: ['Brentwood', 'Oakley', 'Walnut Creek', 'Livermore', 'Pleasanton', 'Discovery Bay', 'More than one area', 'Somewhere else'],
   budget: ['Under $700,000', '$700,000–$1 million', '$1–$1.5 million', '$1.5–$2 million', '$2 million+', 'Still deciding'],
   timeline: ['As soon as possible', 'Within 3 months', '3–6 months', '6–12 months', 'Just researching'],
   contact_method: ['email', 'text', 'call'],
