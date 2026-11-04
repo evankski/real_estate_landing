@@ -64,7 +64,7 @@ test('valid lead maps to FUB events and preserves qualification, consent, and ca
     tags: ['Marketing lead', 'Paid ad', 'Facebook']
   });
   assert.equal(outgoing.payload.type, 'General Inquiry');
-  assert.equal(outgoing.payload.source, 'evankrealestate.com');
+  assert.equal(outgoing.payload.source, 'Website');
   assert.deepEqual(outgoing.payload.campaign, {
     source: 'facebook', medium: 'paid-social', term: 'home', content: 'video-a', campaign: 'brentwood'
   });
@@ -283,7 +283,7 @@ test('campaign requests preserve their specific preferences without requiring a 
     });
     assert.equal(result.status, 200, fields.campaign_id);
     assert.equal(payload.person.phones, undefined);
-    assert.equal(payload.source, 'evankrealestate.com');
+    assert.equal(payload.source, 'Website');
     assert.equal(payload.campaign, undefined, 'offer identity is not an invented ad source');
     for (const detail of expected) assert.ok(payload.message.includes(detail), detail);
     assert.ok(payload.message.includes(CONTACT_CONSENT_TEXT));
@@ -544,6 +544,7 @@ test('C02 acknowledges durable storage, even during an email outage, then delive
     assert.ok(h.emails[1].text.includes(appointment[key]),key);
   }
   const event=h.events[0];
+  assert.equal(event.source,'Website');
   assert.deepEqual(event.person.tags,['Marketing lead','C02 - First Home Game Plan','Appointment request','Paid ad','Instagram']);
   assert.equal(event.campaign.content,'ad_a');
   assert.match(event.message,/no appointment has been booked/);

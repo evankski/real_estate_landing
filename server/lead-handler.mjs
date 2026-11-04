@@ -350,7 +350,7 @@ function eventPayload(lead, system) {
     ...(lead.phone ? { phones: [{ value: lead.phone }] } : {})
   };
   const payload = {
-    source: 'evankrealestate.com',
+    source: 'Website',
     system,
     type: 'General Inquiry',
     person,

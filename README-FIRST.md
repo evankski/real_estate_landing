@@ -73,7 +73,7 @@ automation settings must be reviewed separately: a note stating that marketing
 permission was not collected does not prevent an existing action plan from running.
 UTM source, medium, campaign, term, and content map to the FUB campaign object
 when a UTM source is present; partial attribution stays in the message.
-The lead source is `evankrealestate.com`. Recognized campaign forms and paid ad
+The FUB lead source is `Website`. Recognized campaign forms and paid ad
 traffic receive server-generated acquisition tags. See [C02 attribution and ad links](CAMPAIGN-02.md#fub-tags-and-advertising-links).
 
 Set `FUB_SYSTEM` to your integration's system name. It defaults to
