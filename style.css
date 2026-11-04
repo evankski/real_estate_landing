@@ -39,7 +39,7 @@
 .buyer-panel,.seller-panel,.approach{position:relative}.legacy-anchor{position:absolute;inset:0 auto auto 0;width:0;height:0;pointer-events:none}
 .area-page-hero .button{margin-top:24px}.site-footer .brand{margin-bottom:20px}
 
-/* Accessible controls and privacy choices without a content-obscuring overlay. */
+/* Shared controls and the non-modal privacy panel. */
 .form-grid input:not([type=checkbox]),.form-grid select,.form-grid textarea,.intent-options input{border-color:var(--control-border)}
 .buyer-panel :focus-visible,.contact :focus-visible{outline-color:var(--accent-soft)}
 .contact-form :focus-visible,.comparison-sheet :focus-visible{outline-color:var(--focus)}
@@ -47,7 +47,13 @@
 .privacy-status{font-size:12px;line-height:1.6;padding-block:14px 10px;margin-bottom:0}
 .privacy-help{font-size:12px;padding-bottom:25px;margin-bottom:0}
 html:not(.js) #cookieSettingsButton,html:not(.js) #doNotSellButton{display:none}
-.cookie-banner{position:relative;inset:auto;width:min(620px,calc(100% - 40px));margin:24px auto;box-shadow:none}
+.cookie-banner{
+  --edge:16px;
+  position:fixed;inset:auto max(var(--edge),env(safe-area-inset-right)) max(var(--edge),env(safe-area-inset-bottom)) auto;
+  width:min(420px,calc(100% - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height:calc(100dvh - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  margin:0;border-radius:var(--radius);overflow-y:auto;overscroll-behavior:contain
+}
 .cookie-banner .cookie-policy-links{margin-bottom:0}
 .cookie-banner button:disabled{cursor:default}
 .policy-card h2[id]{scroll-margin-top:150px}
@@ -59,7 +65,7 @@ html:not(.js) #cookieSettingsButton,html:not(.js) #doNotSellButton{display:none}
 }
 @media(max-width:760px){
   .strip-inner{font-size:12px;flex-wrap:wrap}
-  .cookie-banner{inset:auto}
+  .cookie-banner{--edge:10px}
 }
 
 /* Lead with the person and the conversation. Keep blue for actions and use

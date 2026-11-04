@@ -168,7 +168,6 @@
     cookieBanner.setAttribute('aria-hidden', 'false');
     document.body.classList.add('has-cookie-banner');
     if (moveFocus && rejectCookies) {
-      cookieBanner.scrollIntoView({ block: 'center', behavior: 'auto' });
       rejectCookies.focus({ preventScroll: true });
     }
   }

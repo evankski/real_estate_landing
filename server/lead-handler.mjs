@@ -365,7 +365,7 @@ function eventPayload(lead, system) {
 async function emailInquiry(lead, payload, { fetchImpl, origin, signal }) {
   // The provider envelope and recipient are server-controlled.
   const email = await fetchImpl(EMAIL_ENDPOINT, {
-    method: 'POST', redirect: 'error', signal,
+    method: 'POST', redirect: 'manual', signal,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: origin + '/' },
     body: JSON.stringify({
       name: [lead.firstName, lead.lastName].filter(Boolean).join(' '),

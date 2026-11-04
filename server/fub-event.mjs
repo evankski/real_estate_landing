@@ -15,7 +15,7 @@ export async function submitFubEvent(payload, { apiKey, system, systemKey, fetch
     headers,
     body: JSON.stringify(payload),
     signal,
-    redirect: 'error'
+    redirect: 'manual'
   });
   // A 204 indicates an archived FUB source. Upstream content is never exposed.
   await response.body?.cancel();

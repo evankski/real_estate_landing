@@ -56,7 +56,7 @@ test('valid lead maps to FUB events and preserves qualification, consent, and ca
   assert.equal(outgoing.init.headers.Authorization, `Basic ${btoa(`${fakeKey}:`)}`);
   assert.equal(outgoing.init.headers['X-System'], 'RegisteredSite');
   assert.equal(outgoing.init.headers['X-System-Key'], 'test-system-key');
-  assert.equal(outgoing.init.redirect, 'error');
+  assert.equal(outgoing.init.redirect, 'manual');
   assert.deepEqual(outgoing.payload.person, {
     firstName: 'Jamie', lastName: 'Buyer',
     emails: [{ value: 'jamie@example.test' }],
@@ -627,6 +627,7 @@ test('Microsoft sends only to Evan, retries refused mail, and accepts an empty 2
     C02_MS_CLIENT_ID:'00000000-0000-0000-0000-000000000002', C02_MS_CLIENT_SECRET:'test-only'});
   let sends = 0;
   h.env.fetch = async (url,init) => {
+    assert.equal(init.redirect, 'manual', 'Workers must not follow a redirect with credentials');
     if (url === 'https://login.microsoftonline.com/' + h.env.C02_MS_TENANT_ID + '/oauth2/v2.0/token') {
       assert.equal(init.body.get('scope'),'https://graph.microsoft.com/.default');
       assert.equal(init.body.get('grant_type'),'client_credentials');
@@ -639,7 +640,7 @@ test('Microsoft sends only to Evan, retries refused mail, and accepts an empty 2
     assert.deepEqual(message.toRecipients,[{emailAddress:{address:'evan@thewowski.com'}}]);
     assert.deepEqual(message.replyTo,[{emailAddress:{address:appointment.email}}]);
     assert.match(message.body.content,/Callback number: 925-555-0123/);
-    return new Response(null,{status: ++sends === 1 ? 403 : 202});
+    return new Response(null,{status: ++sends === 1 ? 307 : 202});
   };
   await worker.fetch(request({...appointment, phone:'925-555-0123',to:'ignored@example.invalid'}),h.env);
   await h.alarm();

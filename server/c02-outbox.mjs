@@ -59,7 +59,10 @@ export class C02AppointmentOutbox {
         job.emailPending = false;
       } catch (e) { this.logRetry(job,'email',e); }
       finally { clearTimeout(timer); }
-      if (!job.emailPending) await this.storage.put('job',job);
+      if (!job.emailPending) {
+        await this.storage.put('job',job);
+        console.info('C02 delivery accepted', {reference:job.key.slice(0,16), channel:'email'});
+      }
     }
     if (job.fubPending) {
       try {
@@ -69,7 +72,10 @@ export class C02AppointmentOutbox {
         if (!ok) throw new Error('No CRM receipt');
         job.fubPending = false;
       } catch (e) { this.logRetry(job,'FUB',e); }
-      if (!job.fubPending) await this.storage.put('job',job);
+      if (!job.fubPending) {
+        await this.storage.put('job',job);
+        console.info('C02 delivery accepted', {reference:job.key.slice(0,16), channel:'FUB'});
+      }
     }
     if (!job.emailPending && !job.fubPending) {
       // No buyer data in the deduplication marker. Forget even the marker later.
@@ -84,7 +90,7 @@ export class C02AppointmentOutbox {
     const key = this.env.RESEND_API_KEY?.trim();
     if (!key) throw Object.assign(new Error('Sender not configured'), {code:'SENDER_NOT_CONFIGURED'});
     const response = await (this.env.fetch || globalThis.fetch)('https://api.resend.com/emails', {
-      method:'POST', redirect:'error', signal:AbortSignal.timeout(10000),
+      method:'POST', redirect:'manual', signal:AbortSignal.timeout(10000),
       headers:{Authorization:'Bearer '+key,'Content-Type':'application/json','Idempotency-Key':'c02/'+job.key},
       body:JSON.stringify({from:mail.from,to:[mail.to],reply_to:mail.replyTo,subject:mail.subject,text:mail.text})
     });

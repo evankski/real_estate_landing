@@ -105,7 +105,7 @@ export async function firstHomePages(ui) {
   ${scheduling(ui,bookingUrl)}`;
   const landing = page({path:c.route,title:c.title,description:'A free 20-minute planning call for first-time buyers, with a worksheet and up to three next actions.',
     cta:'Book my call',href:'#booking',body:'data-campaign-id="C02" data-first-home',footer,content,
-    pageStyle:`<style>${style}</style>\n`,pageScript:`<script>{\n${firstHomeAppointment.toString()}\n${bookingJS}\n}</script>\n`,scriptVersion:'c02-durable-intake-v1'});
+    pageStyle:`<style>${style}</style>\n`,pageScript:`<script>{\n${firstHomeAppointment.toString()}\n${bookingJS}\n}</script>\n`});
   const sheetReceipt = page({path:c.sheetThanks, title:'Your First Home Next Steps Sheet', description:'Download the worksheet or return to the First Home Game Plan.', footer,
     noindex:true, cta:'Back to the plan', href:c.route, body:'data-campaign-id="C02" data-first-home',
     pageStyle:`<style>${style}</style>\n`, content:`<section class="container c02-section"><h1>The First Home Next Steps Sheet</h1>

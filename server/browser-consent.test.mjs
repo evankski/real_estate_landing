@@ -113,8 +113,7 @@ test('disabling the feature for rollback prevents any allow action from loading 
   page.ids.cookieSettingsButton.click();
   assert.equal(page.ids.cookieBanner.hidden, false);
   assert.equal(page.ids.acceptCookies.disabled, true);
-  assert.equal(page.ids.cookieBanner.scrollCalls.length, 1);
-  assert.equal(page.ids.cookieBanner.scrollCalls[0].block, 'center');
+  assert.equal(page.ids.cookieBanner.scrollCalls.length, 0);
   page.ids.acceptCookies.click();
   assert.equal(page.localStorage.getItem(CHOICE_KEY), null);
   assert.equal(page.injectedScripts.length, 0);

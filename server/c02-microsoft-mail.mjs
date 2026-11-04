@@ -7,7 +7,8 @@ export async function sendMicrosoftAppointment(mail, env) {
     throw Object.assign(new Error('Microsoft sender not configured'), {code:'MS_CONFIG'});
   }
   const send = env.fetch || globalThis.fetch;
-  const options = {method:'POST', redirect:'error', signal:AbortSignal.timeout(10000)};
+  // Workers supports manual redirects. Only the expected provider status counts as acceptance.
+  const options = {method:'POST', redirect:'manual', signal:AbortSignal.timeout(10000)};
   const auth = await send('https://login.microsoftonline.com/' + tenant + '/oauth2/v2.0/token', {
     ...options, body:new URLSearchParams({client_id:client, client_secret:env.C02_MS_CLIENT_SECRET,
       grant_type:'client_credentials', scope:'https://graph.microsoft.com/.default'})
