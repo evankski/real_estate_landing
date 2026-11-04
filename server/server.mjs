@@ -58,6 +58,8 @@ export async function serveAsset(rawUrl, method = 'GET', root = SITE_ROOT, reque
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'no-cache'
     });
+    // A JS-disabled preview must never POST sample contact details to the live Worker.
+    if (extension === '.html') headers.set('Content-Security-Policy', "form-action 'self'");
     if ('/' + relativePath === worksheetCampaigns.C02.pdf) {
       headers.set('Content-Disposition', `inline; filename="${worksheetCampaigns.C02.downloadName}"`);
     }

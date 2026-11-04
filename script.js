@@ -543,67 +543,37 @@
         credentials: 'omit',
         referrerPolicy: 'origin'
       };
-      if (payload.campaign_id === 'C02' && payload.request_type === 'First Home Game Plan time request') {
-        // This endpoint deduplicates the appointment. Replaying the exact body
-        // is safe if the response was lost after the server committed it.
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const controller = new AbortController();
-          const abort = () => controller.abort();
-          if (signal?.aborted) throw Object.assign(new Error('Request interrupted'), {retryable:true});
-          signal?.addEventListener('abort', abort, {once:true});
-          const timer = setTimeout(abort, 4500);
-          let retryable = true;
-          try {
-            const response = await fetch((!isLocalPreviewHost && intakeUrl) || '/api/leads', {...options, signal:controller.signal});
-            retryable = response.status >= 500 || [408,429].includes(response.status);
-            if (isLocalPreviewHost && [404,405].includes(response.status)) return 'preview';
-            const result = await response.json();
-            if (isLocalPreviewHost && response.ok && result.code === 'LOCAL_PREVIEW' && result.success === false) return 'preview';
-            if (response.status === 202 && result.success === true && result.delivery?.email === 'queued') return 'accepted';
-            throw new Error('Request not acknowledged');
-          } catch (error) {
-            if (!retryable || attempt === 2 || signal?.aborted) {
-              throw Object.assign(new Error('Request not acknowledged'), {retryable});
-            }
-          } finally {
-            clearTimeout(timer);
-            signal?.removeEventListener('abort', abort);
+      // The Worker saves each submission once, even if the first receipt is lost.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        if (signal?.aborted) throw Object.assign(new Error('Request interrupted'), {retryable:true});
+        signal?.addEventListener('abort', abort, {once:true});
+        const timer = setTimeout(abort, 4500);
+        let retryable = true;
+        try {
+          const response = await fetch((!isLocalPreviewHost && intakeUrl) || '/api/leads', {...options, signal:controller.signal});
+          retryable = response.status >= 500 || [408,429].includes(response.status);
+          if (isLocalPreviewHost && [404,405].includes(response.status)) return 'preview';
+          const result = await response.json();
+          if (isLocalPreviewHost && response.ok && result.code === 'LOCAL_PREVIEW' && result.success === false) return 'preview';
+          if (response.status === 202 && result.success === true && result.delivery?.email === 'queued' && result.delivery?.fub === 'queued') return 'accepted';
+          throw new Error('Request not acknowledged');
+        } catch (error) {
+          if (!retryable || attempt === 2 || signal?.aborted) {
+            throw Object.assign(new Error('Request not acknowledged'), {retryable});
           }
-          await new Promise(resolve => setTimeout(resolve, 350 * 2 ** attempt));
+        } finally {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
         }
+        await new Promise(resolve => setTimeout(resolve, 350 * 2 ** attempt));
       }
-      let response = await fetch('/api/leads', options);
-      let result = null;
-      try {
-        result = await response.json();
-      } catch (error) {
-        // Static hosts may return an HTML 404 for an unavailable API route.
-      }
-      // These responses establish that the API has not sent the inquiry. Other
-      // failures may be ambiguous, so never resubmit automatically after them.
-      const noDeliveryApi = response.status === 404 || response.status === 405
-        || (response.status === 503 && result?.code === 'NOT_CONFIGURED');
-      if (isLocalPreviewHost && (noDeliveryApi || (response.ok && result?.code === 'LOCAL_PREVIEW' && result.success === false))) {
-        // A static localhost or an older unconfigured preview server must not email test data.
-        return 'preview';
-      }
-      if (noDeliveryApi) {
-        // Static hosts cannot relay this request. Form encoding avoids a cross-origin
-        // OPTIONS preflight; the provider must still explicitly acknowledge the POST.
-        response = await fetch('https://formsubmit.co/ajax/evan@thewowski.com', {
-          ...options, headers: { Accept: 'application/json' }, body: new URLSearchParams(payload)
-        });
-        result = await response.json();
-      }
-      if (!response.ok || (result?.success !== true && result?.success !== 'true')) {
-        throw new Error('The inquiry service did not confirm the inquiry.');
-      }
-      return 'accepted';
     }
 
     captureAttribution();
     if (isLocalPreviewHost && !form.dataset.sheetEmail) {
-      setStatus('Local test: use sample details. Without a Follow Up Boss key, this opens the next page without sending an inquiry. With a key, it sends a real inquiry.');
+      setStatus('Local preview: use sample details. The Node preview does not send email or create a Follow Up Boss lead.');
     }
     updatePhoneRequirement();
     if (contactMethod) contactMethod.addEventListener('change', updatePhoneRequirement);
@@ -692,7 +662,7 @@
       const timeout = window.setTimeout(() => controller.abort(), 20000);
       try {
         const payload = Object.fromEntries(new FormData(form).entries());
-        if (await sendInquiry(payload, controller.signal) === 'preview') {
+        if (await sendInquiry(payload, controller.signal, form.action) === 'preview') {
           if (form.dataset.sheetEmail) {
             setStatus('Local preview. Your worksheet request was not sent. You can download the PDF above.', 'preview');
             resetFormSubmitState();

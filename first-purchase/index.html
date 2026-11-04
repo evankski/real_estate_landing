@@ -138,11 +138,10 @@
   <section class="c02-section c02-sheet" id="sheet"><div class="container c02-columns"><div><h2>The First Home Next Steps Sheet</h2>
     <p>Start on the page that matches your question. Page two helps you ask a lender for a payment and cash estimate. Page three narrows down which homes are worth touring. On page four, put a date beside your next action.</p>
     <p>You can use the sheet on your own. A call is optional.</p><a class="button secondary" href="/resources/first-home-next-steps-sheet.pdf" download="First Home Next Steps Sheet.pdf">Download the worksheet (PDF)</a>
-    <details class="c02-email"><summary>Email me the sheet</summary><p>I’ll email a copy personally when I receive your request.</p><form id="contactForm" data-sheet-email="true" class="contact-form campaign-form" action="https://formsubmit.co/evan@thewowski.com" method="POST" data-thanks-path="/first-purchase/sheet-request/" data-campaign-id="C02" data-success-message="Your worksheet request was received. I’ll email you a copy personally.">
+    <details class="c02-email"><summary>Email me the sheet</summary><p>I’ll email a copy personally when I receive your request.</p><form id="contactForm" data-sheet-email="true" class="contact-form campaign-form" action="https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads" method="POST" data-thanks-path="/first-purchase/sheet-request/" data-campaign-id="C02" data-success-message="Your worksheet request was received. I’ll email you a copy personally.">
     <div class="form-head"><span id="requestLabel">Email me the sheet</span><span id="formStepStatus" aria-live="polite">Your request</span></div>
-    <input type="hidden" name="_subject" value="First Home Next Steps Sheet | Evan Karwowski" /><input type="hidden" name="_template" value="table" /><input type="hidden" name="_captcha" value="false" /><input type="hidden" name="_next" value="https://www.evankrealestate.com/first-purchase/sheet-request/?submitted=1" />
     <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" hidden />
-    <input type="hidden" name="source" value="evankrealestate.com" /><input type="hidden" name="campaign_id" value="C02" /><input type="hidden" name="interest" value="Buying a home" /><input type="hidden" name="request_type" value="First Home Next Steps Sheet" id="requestType" /><input type="hidden" name="cta_source" value="c02-sheet-email-form" id="ctaSourceField" /><input type="hidden" name="cookie_choice" value="not selected" id="cookieChoiceField" />
+    <input type="hidden" name="campaign_id" value="C02" /><input type="hidden" name="interest" value="Buying a home" /><input type="hidden" name="request_type" value="First Home Next Steps Sheet" id="requestType" /><input type="hidden" name="cta_source" value="c02-sheet-email-form" id="ctaSourceField" /><input type="hidden" name="cookie_choice" value="not selected" id="cookieChoiceField" />
     <p class="collection-notice">We collect the details you submit to respond to your request and manage the conversation. <a href="/privacy.html#notice-at-collection">Read the Notice at Collection</a> for what we collect, who receives it, and your choices. Optional advertising tracking is separate.</p>
     <input type="hidden" name="consent_version" value="2026-10-19-inquiry-v2" /><input type="hidden" name="consent_text" value="I ask Evan Karwowski with WR Properties to reply to this inquiry using my selected contact method. This is not consent to automated marketing calls, marketing texts, or an email newsletter." /><input type="hidden" name="marketing_permission" value="Not collected. Inquiry response only." />
   <input type="hidden" name="contact_method" value="email" /><input type="hidden" name="route_version" value="outlook-request-v3" /><fieldset><legend>Where should I send your copy?</legend><div class="form-grid">
@@ -159,7 +158,7 @@
   <p>Tell me a little about your plans so we can spend the call on what matters to you.</p>
   <p>Choose the date and time you’d like for our 20-minute call. I’ll check my calendar and email you to confirm.</p></div>
   <div><noscript><p><a href="mailto:evan@thewowski.com?subject=First%20Home%20Game%20Plan">Email Evan to arrange the call</a> and include your time zone.</p></noscript>
-  <form id="c02-preparation" class="contact-form c02-form" data-calendar="" data-intake="https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads" data-request-type="First Home Game Plan time request" data-version="phone-call-v4" method="post" action="/first-purchase/#booking" hidden>
+  <form id="c02-preparation" class="contact-form c02-form" data-calendar="" data-request-type="First Home Game Plan time request" data-version="phone-call-v4" method="post" action="https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads" hidden>
   <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" hidden>
   <fieldset id="c02-questions"><legend>A little about your plans</legend><div class="form-grid">
   <label class="full-span">Where are you considering buying?<input name="buying_area" maxlength="160" required placeholder="A town, a few areas, or still exploring" /></label>
@@ -368,9 +367,8 @@ window.initFirstHomeBooking = function ({sendInquiry, measure, context}) {
         'Open in Outlook': appointment.outlookUrl,
         campaign_id: 'C02', request_type: form.dataset.requestType, route_version: form.dataset.version,
         interest: 'Buying a home', contact_method: 'call', meeting_format: 'Phone', cta_source: 'C02 manual time request',
-        _subject: 'First Home Game Plan request | ' + appointment.label, _template: 'table',
         marketing_permission: 'Inquiry response only.'
-      }, controller.signal, form.dataset.intake);
+      }, controller.signal, form.action);
       if (result === 'preview') {
         say('Local preview for ' + appointment.label + '. No email was sent or time reserved.', 'preview');
         previewDraft.href = appointment.outlookUrl;
@@ -484,6 +482,6 @@ window.initFirstHomeBooking = function ({sendInquiry, measure, context}) {
 };
 
 }</script>
-<script src="/script.js?v=20261103-privacy2" defer></script>
+<script src="/script.js?v=20261103-forms1" defer></script>
 <script src="/campaigns.js?v=20261103-coastal1" defer></script>
 </body></html>

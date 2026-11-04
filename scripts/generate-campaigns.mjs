@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, access, readdir, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { site, campaigns, checklist, videos, bookingLinks, openHouse } from './campaign-config.mjs';
+import { websiteIntakeUrl, site, campaigns, checklist, videos, bookingLinks, openHouse } from './campaign-config.mjs';
 import { isPropertySlug, isPublicPath } from '../server/public-paths.mjs';
 import { shortlistPages } from './generate-shortlist.mjs';
 import { firstHomePages } from './generate-first-home.mjs';
@@ -54,7 +54,7 @@ ${header(cta, href)}
 <main id="main" tabindex="-1">${content}</main>
 ${footer}
 ${cookiePanel}
-${pageScript}<script src="/script.js?v=${sharedAssetVersion}" defer></script>
+${pageScript}<script src="/script.js?v=20261103-forms1" defer></script>
 <script src="/campaigns.js?v=${version}" defer></script>
 </body></html>
 `;
@@ -172,11 +172,10 @@ function formStart({ key, requestType, interest, campaignId, thanks, label, prop
   const successMessage = suppliedMessage || (key.startsWith('book-')
     ? 'Your time request is on its way. Evan will reply to confirm availability. No appointment is reserved yet.'
     : 'Your request is on its way. Evan will reply personally using your selected contact method. You do not need to book a call to receive the requested help.');
-  return `<form id="contactForm" class="contact-form campaign-form" action="https://formsubmit.co/${site.email}" method="POST" data-thanks-path="${thanks}" data-campaign-id="${campaignId}" data-success-message="${esc(successMessage)}">
+  return `<form id="contactForm" class="contact-form campaign-form" action="${esc(websiteIntakeUrl)}" method="POST" data-thanks-path="${thanks}" data-campaign-id="${campaignId}" data-success-message="${esc(successMessage)}">
     <div class="form-head"><span id="requestLabel">${esc(label)}</span><span id="formStepStatus" aria-live="polite">Your request</span></div>
-    ${hidden('_subject', `${requestType} | Evan Karwowski`)}${hidden('_template', 'table')}${hidden('_captcha', 'false')}${hidden('_next', `${site.domain}${thanks}?submitted=1`)}
     <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" hidden />
-    ${hidden('source', 'evankrealestate.com')}${hidden('campaign_id', campaignId)}${hidden('interest', interest)}${hidden('request_type', requestType, 'requestType')}${hidden('cta_source', `${key}-form`, 'ctaSourceField')}${hidden('cookie_choice', 'not selected', 'cookieChoiceField')}${propertySlug ? hidden('property_slug', propertySlug) : ''}
+    ${hidden('campaign_id', campaignId)}${hidden('interest', interest)}${hidden('request_type', requestType, 'requestType')}${hidden('cta_source', `${key}-form`, 'ctaSourceField')}${hidden('cookie_choice', 'not selected', 'cookieChoiceField')}${propertySlug ? hidden('property_slug', propertySlug) : ''}
     <p class="collection-notice">We collect the details you submit to respond to your request and manage the conversation. <a href="/privacy.html#notice-at-collection">Read the Notice at Collection</a> for what we collect, who receives it, and your choices. Optional advertising tracking is separate.</p>
     ${hidden('consent_version', '2026-10-19-inquiry-v2')}${hidden('consent_text', consent)}${hidden('marketing_permission', 'Not collected. Inquiry response only.')}
   `;

@@ -24,60 +24,23 @@ function deliveryWith(responses, isLocalPreviewHost = false) {
   return { send, requests };
 }
 
-for (const status of [404, 405]) {
-  test(`static host HTTP ${status} falls back to email with the inquiry intact`, async () => {
-    const delivery = deliveryWith([
-      new Response('<html>Static host</html>', { status }),
-      Response.json({ success: 'true' })
-    ]);
-    const payload = { name: 'Local test', email: 'test@example.invalid', utm_source: 'facebook' };
-    await delivery.send(payload);
-    assert.deepEqual(delivery.requests.map(request => request.url), [
-      '/api/leads', 'https://formsubmit.co/ajax/evan@thewowski.com'
-    ]);
-    const post = new Request(delivery.requests[1].url, delivery.requests[1].options);
-    assert.match(post.headers.get('Content-Type'), /^application\/x-www-form-urlencoded/);
-    assert.deepEqual([...post.headers.keys()].sort(), ['accept', 'content-type']);
-    assert.deepEqual(Object.fromEntries(new URLSearchParams(await post.text())), payload);
-  });
-}
-
-test('explicitly unconfigured API falls back to email', async () => {
-  const delivery = deliveryWith([
-    Response.json({ code: 'NOT_CONFIGURED' }, { status: 503 }),
-    Response.json({ success: true })
-  ]);
-  await delivery.send({});
-  assert.equal(delivery.requests.length, 2);
-});
-
-test('successful API delivery never also emails the lead', async () => {
-  const delivery = deliveryWith([Response.json({ success: true })]);
-  await delivery.send({});
-  assert.equal(delivery.requests.length, 1);
-});
-
-test('a preview-only response cannot unlock a public form', async () => {
-  const delivery = deliveryWith([Response.json({success: false, code: 'LOCAL_PREVIEW'})]);
-  await assert.rejects(delivery.send({}));
-  assert.equal(delivery.requests.length, 1);
-});
-
-test('ambiguous failures never resubmit through email', async () => {
-  for (const response of [
-    Response.json({ success: false }, { status: 500 }),
-    Response.json({ code: 'UPSTREAM_ERROR' }, { status: 503 }),
-    new Error('network failure')
-  ]) {
-    const delivery = deliveryWith([response]);
-    await assert.rejects(delivery.send({}));
-    assert.equal(delivery.requests.length, 1);
+const queued = () => Response.json({success:true,delivery:{email:'queued',fub:'queued'}},{status:202});
+test('ordinary inquiries require durable acceptance for both destinations',async()=>{
+  for (const response of [new Response(null,{status:404}),Response.json({success:true}),
+      Response.json({success:true,delivery:{email:'queued'}},{status:202}),Response.json({success:false,code:'LOCAL_PREVIEW'})]) {
+    const d=deliveryWith([response]);
+    await assert.rejects(d.send({name:'Test'}));
+    assert.equal(d.requests.length,1);
   }
+  const url='https://example.test/api/leads', d=deliveryWith([new Error('lost receipt'),queued()]);
+  assert.equal(await d.send({name:'Test'},undefined,url),'accepted');
+  assert.deepEqual(d.requests.map(r=>r.url),[url,url]);
+  assert.equal(d.requests[0].options.body,d.requests[1].options.body);
 });
 
 const appointment = {campaign_id:'C02',request_type:'First Home Game Plan time request'};
 test('a lost appointment receipt automatically replays the identical request only to the outbox', async () => {
-  const d = deliveryWith([new Error('response lost'), Response.json({success:true,delivery:{email:'queued'}},{status:202})]);
+  const d = deliveryWith([new Error('response lost'), queued()]);
   assert.equal(await d.send(appointment),'accepted');
   assert.deepEqual(d.requests.map(x=>x.url), ['/api/leads','/api/leads']);
   assert.equal(d.requests[0].options.body,d.requests[1].options.body);
@@ -95,7 +58,7 @@ test('absent intake, a stale synchronous success and missing storage never count
 });
 test('GitHub Pages can send C02 to its configured Worker; local previews cannot reach that remote endpoint',async()=>{
   const hosted='https://example.test/api/leads';
-  const d=deliveryWith([Response.json({success:true,delivery:{email:'queued'}},{status:202})]);
+  const d=deliveryWith([queued()]);
   assert.equal(await d.send(appointment,undefined,hosted),'accepted');
   assert.equal(d.requests[0].url,hosted);
   const local=deliveryWith([Response.json({success:false,code:'LOCAL_PREVIEW'})],true);

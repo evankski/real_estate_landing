@@ -1,3 +1,4 @@
+import {websiteIntakeUrl} from '../scripts/campaign-config.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -28,10 +29,11 @@ function element(properties = {}) {
 
 // This runs the unchanged browser script with a small DOM and stubbed services.
 // Form values never leave the process, and no advertising script is loaded.
+const receipt = () => Response.json({success:true,delivery:{email:'queued',fub:'queued'}},{status:202});
 function openForm({
   campaignId = 'C1', requestType = 'Home comparison', interest = 'Buying a home',
   pathname = '/compare/', thanksPath = '/thanks/compare/', query = '',
-  extra = {}, responses = [Response.json({ success: true })], storageBlocked = false,
+  extra = {}, responses = [receipt()], storageBlocked = false,
   privacyChoice, gpc = false, origin = 'https://www.evankrealestate.com'
 } = {}) {
   const fields = Object.entries({
@@ -67,6 +69,7 @@ function openForm({
     querySelector() { return items.find(field => field.type !== 'hidden') || null; }
   }));
   const form = element({
+    action:websiteIntakeUrl,
     dataset: { thanksPath, successMessage: 'Your request is on its way. Evan will reply.', ...(campaignId === 'C02' ? {sheetEmail:'true'} : {}) },
     elements: fields,
     appendChild(field) { fields.push(field); },
@@ -143,7 +146,7 @@ function openForm({
   }
   runInNewContext(script, {
     window, document, navigator: { globalPrivacyControl: gpc }, URL, URLSearchParams, Date, FormData, fetch,
-    AbortController, console: { warn() {} }
+    AbortController, setTimeout, clearTimeout, console: { warn() {} }
   }, { timeout: 1000, filename: 'script.js' });
   return {
     fields, ids, form, cta, next, back, submit, steps, requests, redirects, stored, injectedScripts,
@@ -231,17 +234,17 @@ test('homepage query and CTA selection still update its general inquiry and orig
   assert.equal(JSON.parse(page.stored.get(RECEIPT_KEY)).campaignId, '');
 });
 
-test('campaign email fallback preserves the offer fields and uses its own confirmation route', async () => {
+test('campaign retry through the same Worker preserves the offer fields and uses its own confirmation route', async () => {
   const page = openForm({
     campaignId: 'C3', requestType: 'Seller pricing and preparation', interest: 'Selling a home',
     pathname: '/seller-plan/', thanksPath: '/thanks/seller-plan/',
     extra: { property_address: '123 Example Lane', property_notes: 'A preliminary review, please.' },
-    responses: [Response.json({ code: 'NOT_CONFIGURED' }, { status: 503 }), Response.json({ success: 'true' })]
+    responses: [Response.json({ code: 'NOT_CONFIGURED' }, { status: 503 }), receipt()]
   });
   await page.submitForm();
   await page.submitForm();
   assert.deepEqual(page.requests.map(request => request.url),
-    ['/api/leads', 'https://formsubmit.co/ajax/evan@thewowski.com']);
+    [websiteIntakeUrl, websiteIntakeUrl]);
   assert.deepEqual(page.requests[0].payload, page.requests[1].payload);
   assert.equal(page.requests[1].payload.property_address, '123 Example Lane');
   assert.equal(page.requests[1].payload.request_type, 'Seller pricing and preparation');
@@ -250,7 +253,6 @@ test('campaign email fallback preserves the offer fields and uses its own confir
 
 test('an unconnected C02 email request stays on the public offer without a receipt or conversion', async () => {
   for (const unavailable of [Response.json({ success: false, code: 'LOCAL_PREVIEW' }),
-    Response.json({ success: false, code: 'NOT_CONFIGURED' }, { status: 503 }),
     new Response('Static preview', { status: 405 })]) {
     const page = openForm({ origin: 'http://127.0.0.1:4173', campaignId: 'C02',
       requestType: 'First Home Next Steps Sheet', pathname: '/first-purchase/', thanksPath: '/first-purchase/sheet-request/',
@@ -279,7 +281,7 @@ test('confirmed C02 worksheet access also works when the browser blocks session 
 test('failed campaign delivery preserves answers and produces neither a receipt nor a redirect', async () => {
   const page = openForm({
     extra: { priority_one: 'Home office' },
-    responses: [Response.json({ success: false }, { status: 502 })]
+    responses: [Response.json({ success: false }, { status: 400 })]
   });
   await page.submitForm();
   await page.submitForm();
@@ -335,7 +337,7 @@ test('an opted-in form sends PageView only and leaves Lead for its accepted than
 test('a failed opted-in form submission never records a Meta Lead', async () => {
   const page = openForm({
     privacyChoice: 'accepted',
-    responses: [Response.json({ success: false }, { status: 502 })]
+    responses: [Response.json({ success: false }, { status: 400 })]
   });
   await page.submitForm();
   await page.submitForm();
@@ -388,7 +390,7 @@ test('C01 review request measurement handles static index and slashless entry UR
 test('only an accepted C02 sheet request gets its own confirmation and preserves attribution', async () => {
   const page = openForm({ campaignId:'C02', requestType:'First Home Next Steps Sheet', pathname:'/first-purchase/', thanksPath:'/first-purchase/sheet-request/',
     query:'?utm_source=instagram&utm_content=guide&email=private&intent=sell', privacyChoice:'rejected',
-    responses:[Response.json({success:false},{status:502}),Response.json({success:true})] });
+    responses:[Response.json({success:false},{status:400}),receipt()] });
   await page.submitForm();
   await page.submitForm();
   assert.equal(page.redirects.length,0);

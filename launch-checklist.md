@@ -82,7 +82,7 @@ separate October 20 owner decision documented above.
 | Automated follow-up | Evan confirmed October 20 that automatic texts, automated or prerecorded calls, drip emails, and call recording are undecided. Website consent remains inquiry-only; FUB account settings are unverified. Keep this source out of marketing automation until the workflow and appropriate consent are approved. |
 | Privacy-law coverage | Determine whether Evan, WR, or the relevant combined business meets CCPA/CPRA applicability criteria. Do not infer coverage from this website's traffic alone. Also inventory actual disclosures over the prior 12 months; source code cannot establish that history. |
 | Privacy operations | Assign responsibility for access/correction/deletion/opt-out requests, identity verification, authorized agents, deadlines, provider coordination, and suppression records. If covered and not exclusively online, check the toll-free request-channel requirement; the published 925 number is not toll-free. |
-| Retention and providers | Adopt an actual category-based retention/deletion schedule and configure FUB, email, host logs and backups accordingly. Review contracts and provider uses. FormSubmit's public policy does not establish a detailed retention/deletion schedule; verify it or choose an approved alternative before relying on it for an ad campaign. |
+| Retention and providers | Adopt an actual category-based retention/deletion schedule and configure FUB, email, host logs and backups accordingly. Review contracts and provider uses. Confirm actual retention with the active providers. |
 | Meta | Enabled October 20 at Evan's request, with visitor opt-in required for PageView and accepted-inquiry Lead events. Account ownership/settings and separate integrations remain unverified. See facebook-pixel-setup.md for checks; activation is not evidence that the account was inspected. |
 | Market/geography | Evan confirmed October 20 that paid ads will target the United States only. Check that campaign settings match this decision. Actual visitors and activities can still create other state/country obligations; review again before expanding targeting. |
 | Hosting and delivery | These changes are local, not deployed. Verify the live HTTPS site, domain, published policies, consent behavior and actual delivery after publishing. The live www domain could not be fetched by the research tool; that result alone does not establish an outage. |
@@ -144,7 +144,7 @@ solely performed on Evan's instructions. Review the actual account agreements,
 privacy settings and permitted uses. Limit staff access, use MFA, protect API
 keys, and establish secure deletion, incident and privacy-request procedures.
 Sources: [FUB privacy notice](https://www.followupboss.com/legal-pages/privacy-notice),
-[FormSubmit privacy terms](https://formsubmit.co/privacy.pdf),
+[Microsoft Privacy Statement](https://privacy.microsoft.com/en-us/privacystatement),
 [FTC information-security guidance](https://www.ftc.gov/business-guidance/resources/protecting-personal-information-guide-business).
 
 Before calls or texts, confirm applicable TCPA, DNC, state-law and carrier rules
@@ -214,7 +214,7 @@ requirements. [FTC CAN-SPAM guide](https://www.ftc.gov/business-guidance/resourc
 
 ## Verification and deployment record
 
-Local checks cover form/consent wording, API validation, email fallback, no
+Local checks cover form/consent wording, API validation, queued email and CRM delivery, no
 unconfirmed lead conversion, opt-in-only measurement paths, persistent
 GPC, cross-tab revocation, privacy links, campaign propagation, and source-file
 protection. Browser checks cover narrow/mobile privacy controls and keyboard

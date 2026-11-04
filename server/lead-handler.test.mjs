@@ -30,9 +30,20 @@ function request(data = valid, options = {}) {
   });
 }
 
+async function submitAndDeliver(req, env) {
+  const h = outboxFixture();
+  Object.assign(h.env, env);
+  const result = await handleLead(req,h.env);
+  assert.deepEqual(await result.clone().json(),{success:true,delivery:{email:'queued',fub:'queued'}});
+  await h.alarm();
+  assert.deepEqual(h.storage.saved,{complete:true});
+  assert.equal(h.emails[0].to,'evan@thewowski.com');
+  return result;
+}
+
 test('valid lead maps to FUB events and preserves qualification, consent, and campaign', async () => {
   let outgoing;
-  const result = await handleLead(request({
+  const result = await submitAndDeliver(request({
     ...valid,
     phone: '(925) 555-0100',
     contact_method: 'text',
@@ -50,8 +61,8 @@ test('valid lead maps to FUB events and preserves qualification, consent, and ca
       return new Response(JSON.stringify({ id: 123 }), { status: 201 });
     }
   });
-  assert.equal(result.status, 200);
-  assert.deepEqual(await result.json(), { success: true });
+  assert.equal(result.status, 202);
+  assert.deepEqual(await result.json(), {success:true,delivery:{email:'queued',fub:'queued'}});
   assert.equal(outgoing.url, 'https://api.followupboss.com/v1/events');
   assert.equal(outgoing.init.headers.Authorization, `Basic ${btoa(`${fakeKey}:`)}`);
   assert.equal(outgoing.init.headers['X-System'], 'RegisteredSite');
@@ -78,52 +89,25 @@ test('valid lead maps to FUB events and preserves qualification, consent, and ca
   assert.ok(!outgoing.init.body.includes('unauthorized'));
 });
 
-test('keyless production relays a validated C02 inquiry to the fixed email recipient', async () => {
-  let sent;
-  const result = await handleLead(request({ ...valid, campaign_id: 'C02',
-    request_type: 'First Home Next Steps Sheet', landing_page: '/first-purchase/',
-    _cc: 'private@example.invalid', _webhook: 'https://example.invalid', _subject: 'untrusted'
-  }), {
-    fetch: async (url, init) => {
-      sent = {url, init, data: JSON.parse(init.body)};
-      return Response.json({ success: 'true' });
-    }
-  });
-  assert.deepEqual(await result.json(), { success: true });
-  assert.equal(sent.url, 'https://formsubmit.co/ajax/evan@thewowski.com');
-  assert.equal(sent.init.headers.Referer, productionOrigin + '/');
-  assert.equal(sent.data.email, valid.email);
-  assert.equal(sent.data._url, productionOrigin + '/first-purchase/');
-  assert.match(sent.data.message, /Offer: C02/);
-  assert.match(sent.data.message, /Consent text:/);
-  assert.doesNotMatch(sent.init.body, /_cc|_webhook|untrusted/);
-});
-
-test('an unconfirmed email relay does not acknowledge delivery or retry', async () => {
-  for (const failure of [Response.json({success: 'false'}), new Response('unavailable'), new Response(null, {status: 503}), new Error('disconnected')]) {
-    let calls = 0;
-    const response = await handleLead(request(), {fetch: async () => {
-      calls++;
-      if (failure instanceof Error) throw failure;
-      return failure;
-    }});
-    assert.equal(calls, 1);
-    assert.equal(response.status, 502);
-    assert.deepEqual(await response.json(), {success: false, code: 'DELIVERY_FAILED'});
-  }
+test('an unavailable intake never silently falls back to email or CRM', async () => {
+  let sends = 0;
+  const response = await handleLead(request(), {FUB_API_KEY:fakeKey, fetch:async()=>{ sends++; }});
+  assert.equal(response.status,503);
+  assert.deepEqual(await response.json(),{success:false,code:'INTAKE_UNAVAILABLE'});
+  assert.equal(sends,0);
 });
 
 test('accepts separate name fields, consent boolean, and existing-contact FUB 200', async () => {
   let payload;
   const { name, ...data } = valid;
-  const result = await handleLead(request({ ...data, firstName: 'Jo', lastName: 'Smith', contact_consent: true }), {
+  const result = await submitAndDeliver(request({ ...data, firstName: 'Jo', lastName: 'Smith', contact_consent: true }), {
     FUB_API_KEY: fakeKey,
     fetch: async (_, init) => {
       payload = JSON.parse(init.body);
       return new Response('{}', { status: 200 });
     }
   });
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 202);
   assert.equal(payload.person.firstName, 'Jo');
   assert.ok(!payload.person.phones);
   assert.equal(payload.system, 'EvanKarwowskiWebsite');
@@ -195,49 +179,25 @@ test('requires an approved origin and only allows matching loopback origins', as
   }), {})).status, 405);
 });
 
-test('upstream failures including archived source never report success or expose secrets', async () => {
-  for (const status of [204, 202, 301, 400, 401, 429, 500]) {
-    const result = await handleLead(request(), {
-      FUB_API_KEY: fakeKey,
-      fetch: async () => new Response(status === 204 ? null : `Upstream private details: ${fakeKey}`, { status })
-    });
-    assert.equal(result.status, 502);
-    const body = await result.text();
-    assert.equal(body, JSON.stringify({ success: false, code: 'DELIVERY_FAILED' }));
-    assert.ok(!body.includes(fakeKey));
+test('an unaccepted FUB status leaves the saved inquiry pending without resending the email',async()=>{
+  for (const status of [204,202,301,400,401,429,500]) {
+    const h = outboxFixture();
+    h.env.fetch = async()=>new Response(null,{status});
+    const res = await handleLead(request(),h.env);
+    assert.equal(res.status,202);
+    await h.alarm();
+    assert.equal(h.storage.saved.fubPending,true);
+    assert.equal(h.storage.saved.emailPending,false);
+    h.env.fetch = async()=>new Response(null,{status:201});
+    await h.alarm();
+    assert.deepEqual(h.storage.saved,{complete:true});
+    assert.equal(h.emails.length,1);
   }
-  const failure = await handleLead(request(), {
-    FUB_API_KEY: fakeKey,
-    fetch: async () => { throw new Error(`Network detail ${fakeKey}`); }
-  });
-  assert.equal(failure.status, 502);
-  assert.ok(!(await failure.text()).includes(fakeKey));
-});
-
-test('upstream timeout aborts fetch and gives an explicit failure', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  let started;
-  let signal;
-  const ready = new Promise(resolve => { started = resolve; });
-  const pending = handleLead(request(), {
-    FUB_API_KEY: fakeKey,
-    fetch: async (_, init) => {
-      signal = init.signal;
-      started();
-      return new Promise(() => {});
-    }
-  });
-  await ready;
-  t.mock.timers.tick(10_000);
-  const result = await pending;
-  assert.equal(signal.aborted, true);
-  assert.equal(result.status, 504);
-  assert.deepEqual(await result.json(), { success: false, code: 'DELIVERY_TIMEOUT' });
 });
 
 test('partial campaign is recorded without inventing its required source', async () => {
   let payload;
-  await handleLead(request({ ...valid, utm_campaign: 'local-homes' }), {
+  await submitAndDeliver(request({ ...valid, utm_campaign: 'local-homes' }), {
     FUB_API_KEY: fakeKey,
     fetch: async (_, init) => {
       payload = JSON.parse(init.body);
@@ -274,14 +234,14 @@ test('campaign requests preserve their specific preferences without requiring a 
   ];
   for (const { expected, ...fields } of requests) {
     let payload;
-    const result = await handleLead(request({ ...valid, ...fields }), {
+    const result = await submitAndDeliver(request({ ...valid, ...fields }), {
       FUB_API_KEY: fakeKey,
       fetch: async (_, init) => {
         payload = JSON.parse(init.body);
         return new Response('{}', { status: 201 });
       }
     });
-    assert.equal(result.status, 200, fields.campaign_id);
+    assert.equal(result.status, 202, fields.campaign_id);
     assert.equal(payload.person.phones, undefined);
     assert.equal(payload.source, 'Website');
     assert.equal(payload.campaign, undefined, 'offer identity is not an invented ad source');
@@ -294,7 +254,7 @@ test('campaign requests preserve their specific preferences without requiring a 
 test('comparison requests accept separate saved listing links and preserve their line breaks', async () => {
   const links = 'https://example.test/home-one\r\nhttps://example.test/home-two\nhttps://example.test/home-three';
   let payload;
-  const result = await handleLead(request({
+  const result = await submitAndDeliver(request({
     ...valid, campaign_id: 'C1', area: 'Oakley', priority_one: 'Home office',
     area_or_listing: links
   }), {
@@ -304,14 +264,14 @@ test('comparison requests accept separate saved listing links and preserve their
       return new Response('{}', { status: 201 });
     }
   });
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 202);
   assert.ok(payload.message.includes(`Town or listing: ${links.replace(/\r\n/g, '\n')}`));
   assert.equal(payload.person.phones, undefined);
 });
 
 test('a checklist-copy-only request is accepted without a personalized outline or phone', async () => {
   let payload;
-  const result = await handleLead(request({
+  const result = await submitAndDeliver(request({
     name: 'Jamie Buyer', email: 'jamie@example.test', campaign_id: 'C2',
     interest: 'Buying a home', request_type: 'Buyer readiness plan',
     contact_method: 'email', area: 'Oakley', readiness_question: 'Not sure yet',
@@ -323,7 +283,7 @@ test('a checklist-copy-only request is accepted without a personalized outline o
       return new Response('{}', { status: 201 });
     }
   });
-  assert.equal(result.status, 200);
+  assert.equal(result.status, 202);
   assert.equal(payload.person.phones, undefined);
   assert.match(payload.message, /Personalized outline requested: No — checklist copy only/);
   assert.match(payload.message, /Marketing permission: Not collected by this form/);
@@ -335,7 +295,7 @@ test('manual scheduling records a time request, never a booked appointment', asy
     ['C1', 'Buyer planning call'], ['C2', 'Buyer planning call'], ['C3', 'Seller planning conversation']
   ]) {
     let payload;
-    const response = await handleLead(request({
+    const response = await submitAndDeliver(request({
       ...valid, campaign_id: campaignId, request_type: requestType,
       preferred_time_one: 'Tuesday afternoon', preferred_time_two: 'Thursday morning',
       timezone: 'America/Los_Angeles', meeting_format: 'Video'
@@ -346,7 +306,7 @@ test('manual scheduling records a time request, never a booked appointment', asy
         return new Response('{}', { status: 201 });
       }
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 202);
     assert.equal(payload.type, 'General Inquiry');
     assert.equal(payload.person.phones, undefined);
     assert.match(payload.message, /First proposed time: Tuesday afternoon/);
@@ -393,7 +353,7 @@ test('invalid campaign identities, incompatible offers, and unbounded preference
 test('worker routes leads to handler and other requests to its assets binding', async () => {
   const assetRequests = [];
   const env = { ASSETS: { fetch: async (assetRequest) => { assetRequests.push(assetRequest); return new Response('asset'); } } };
-  assert.equal((await worker.fetch(request(), { ...env, fetch: async () => Response.json({ success: true }) })).status, 200);
+  assert.equal((await worker.fetch(request(), { ...env, ...outboxFixture().env })).status, 202);
   assert.equal(assetRequests.length, 0);
   assert.equal(await (await worker.fetch(new Request(`${productionOrigin}/?utm_source=facebook`), env)).text(), 'asset');
   assert.equal(assetRequests[0].url, `${productionOrigin}/index.html?utm_source=facebook`);
@@ -418,10 +378,10 @@ const shortlistReview = {
 
 test('C01 resource captures a minimal inquiry separately from the original C1 and does not claim email delivery', async () => {
   let payload;
-  const response = await handleLead(request(shortlistResource), {
+  const response = await submitAndDeliver(request(shortlistResource), {
     FUB_API_KEY: fakeKey, fetch: async (_, init) => { payload = JSON.parse(init.body); return new Response('{}', { status: 201 }); }
   });
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 202);
   assert.equal(payload.type, 'General Inquiry');
   assert.equal(payload.person.phones, undefined);
   assert.match(payload.message, /Offer: C01\n/);
@@ -437,10 +397,10 @@ test('C01 review preserves preparation, contact preferences and a pending schedu
     ['Not sure', 'Eligibility pending']
   ]) {
     let payload;
-    const response = await handleLead(request({ ...shortlistReview, representation_status: representation }), {
+    const response = await submitAndDeliver(request({ ...shortlistReview, representation_status: representation }), {
       FUB_API_KEY: fakeKey, fetch: async (_, init) => { payload = JSON.parse(init.body); return new Response('{}', { status: 200 }); }
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 202);
     assert.ok(payload.message.includes(`Funnel state: ${state}`));
     assert.match(payload.message, /Public listing 1: https:\/\/example.invalid\/home-a/);
     assert.match(payload.message, /Second priority: Outdoor space/);
@@ -474,8 +434,8 @@ test('C02 sheet and planning session reach the correct FUB offer with different 
     timeline: 'Just researching', preferred_time_one: 'Tuesday afternoon', timezone: 'Pacific time', meeting_format: 'Video' };
   for (const [input, state] of [[resource,'Resource requested'],[session,'Time requested'],[{...session,representation_status:'Working with an agent'},'Time requested']]) {
     let outgoing;
-    const res = await handleLead(request(input), { FUB_API_KEY: fakeKey, fetch: async (_,init) => { outgoing = JSON.parse(init.body); return new Response('{}',{status:201}); } });
-    assert.equal(res.status,200);
+    const res = await submitAndDeliver(request(input), { FUB_API_KEY: fakeKey, fetch: async (_,init) => { outgoing = JSON.parse(init.body); return new Response('{}',{status:201}); } });
+    assert.equal(res.status,202);
     assert.match(outgoing.message,/Offer: C02\n/);
     assert.ok(outgoing.message.includes(`Funnel state: ${state}`));
     assert.ok(outgoing.message.includes('/resources/first-home-next-steps-sheet.pdf'));
@@ -554,12 +514,13 @@ test('C02 acknowledges durable storage, even during an email outage, then delive
   await h.alarm(); assert.equal(h.storage.saved,null); // expiry of non-personal dedup marker
 });
 
-test('CRM outages do not block or resend accepted email; a FUB key is optional',async()=>{
+test('CRM outages or a missing key do not block email, and FUB catches up when restored',async()=>{
   for (const withKey of [true,false]) {
     const h=outboxFixture(withKey); h.fubOk=false;
     await worker.fetch(request(appointment),h.env); await h.alarm();
     assert.equal(h.emails.length,1); assert.equal(h.events.length,withKey?1:0);
-    if(withKey){ assert.equal(h.storage.saved.emailPending,false); h.fubOk=true;await h.alarm(); assert.equal(h.events.length,2); }
+    assert.equal(h.storage.saved.emailPending,false);
+    h.env.FUB_API_KEY=fakeKey; h.fubOk=true; await h.alarm(); assert.equal(h.events.length,withKey?2:1);
     assert.equal(h.emails.length,1); assert.deepEqual(h.storage.saved,{complete:true});
   }
 });
@@ -582,11 +543,12 @@ test('permanent configuration faults keep the job recoverable; only committed re
 });
 
 test('production mail to Evan survives a lost Resend acknowledgment with the same provider idempotency key',async()=>{
-  const h=outboxFixture(false);
+  const h=outboxFixture();
   delete h.env.BOOKING_EMAIL;
   h.env.RESEND_API_KEY='test-server-secret';
   const calls=[];
   h.env.fetch=async(url,init)=>{
+    if (url===fubEndpoint) return new Response(null,{status:201});
     assert.equal(url,'https://api.resend.com/emails');
     calls.push({headers:init.headers,mail:JSON.parse(init.body)});
     if(calls.length===1) throw Error('response lost');
@@ -611,23 +573,24 @@ test('the source of a campaign can be filtered even if UTMs are missing, without
     [{ utm_source:'facebook',utm_medium:'organic_social'}, undefined]
   ]) {
     let event;
-    const response=await handleLead(request({...valid,...fields,tags:['auto-enroll-me']}),{FUB_API_KEY:fakeKey, fetch:async (_,init)=>{
+    const response=await submitAndDeliver(request({...valid,...fields,tags:['auto-enroll-me']}),{FUB_API_KEY:fakeKey, fetch:async (_,init)=>{
       event=JSON.parse(init.body);
       return new Response('{}',{status:200});
     }});
-    assert.equal(response.status,200);
+    assert.equal(response.status,202);
     assert.deepEqual(event.person.tags,expected);
     assert.match(event.message,/Marketing permission: Not collected/);
   }
 });
 
 test('Microsoft sends only to Evan, retries refused mail, and accepts an empty 202 independently of FUB', async () => {
-  const h = outboxFixture(false);
+  const h = outboxFixture();
   delete h.env.BOOKING_EMAIL;
   Object.assign(h.env,{C02_MAIL_PROVIDER:'microsoft', C02_MS_TENANT_ID:'00000000-0000-0000-0000-000000000001',
     C02_MS_CLIENT_ID:'00000000-0000-0000-0000-000000000002', C02_MS_CLIENT_SECRET:'test-only'});
   let sends = 0;
   h.env.fetch = async (url,init) => {
+    if (url===fubEndpoint) return new Response(null,{status:201});
     assert.equal(init.redirect, 'manual', 'Workers must not follow a redirect with credentials');
     if (url === 'https://login.microsoftonline.com/' + h.env.C02_MS_TENANT_ID + '/oauth2/v2.0/token') {
       assert.equal(init.body.get('scope'),'https://graph.microsoft.com/.default');
@@ -709,4 +672,42 @@ test('C02 phone requests validate the callback number and preserve it in FUB, em
   for (const phone of ['925-555-0146','925-555-0189']) await worker.fetch(request({...data,phone}),h.env);
   assert.equal(h.ids[0],h.ids[1]);
   assert.notEqual(h.ids[0],h.ids[2]);
+});
+
+test('native HTML submissions save both deliveries and continue to the correct first-party resource', async () => {
+  for (const [fields, path] of [
+    [valid, '/thanks.html'],
+    [{...valid, campaign_id:'C1'},'/thanks/compare/'],
+    [{...valid, campaign_id:'C2', request_type:'Buyer readiness plan'},'/thanks/buyer-plan/'],
+    [{...valid, campaign_id:'C3', request_type:'Seller pricing and preparation', property_address:'123 Example Lane'},'/thanks/seller-plan/'],
+    [{...valid, campaign_id:'C4', request_type:'Open-house details'},'/thanks/open-house/'],
+    [{...valid,campaign_id:'C1',request_type:'Buyer planning call',meeting_format:'Video',preferred_time_one:'Tuesday afternoon',timezone:'Pacific'},'/thanks/booking/'],
+    [shortlistResource, '/compare-homes/watch/'], [shortlistReview, '/thanks/home-shortlist/'],
+    [{...shortlistResource,campaign_id:'C02',request_type:'First Home Next Steps Sheet'},'/first-purchase/sheet-request/']
+  ]) {
+    const h = outboxFixture();
+    const data = {...fields, _next:'https://evil.invalid', _cc:'exfil@example.invalid', _subject:'untrusted'};
+    const result = await handleLead(new Request('https://worker.invalid/api/leads',{
+      method:'POST', headers:{Origin:productionOrigin}, body:new URLSearchParams(data)
+    }),h.env);
+    assert.equal(result.status,303,path);
+    assert.equal(result.headers.get('Location'),productionOrigin+path);
+    await h.alarm();
+    assert.equal(h.emails.length,1); assert.equal(h.events.length,1);
+    assert.equal(h.emails[0].to,'evan@thewowski.com');
+    assert.equal(h.emails[0].replyTo,fields.email);
+    assert.equal(h.events[0].source,'Website');
+    assert.ok(h.emails[0].text.includes(h.events[0].message));
+    assert.doesNotMatch(JSON.stringify([h.events,h.emails]),/evil\.invalid|exfil@|untrusted/);
+  }
+});
+
+test('inquiry retries reuse the saved job, while changed answers and distinct offers create distinct jobs',async()=>{
+  const h=outboxFixture();
+  for (const overrides of [{},{submitted_at:new Date().toISOString()},{message:'Updated priorities'},{campaign_id:'C1'}]) {
+    const res=await handleLead(request({...valid,...overrides}),h.env);
+    assert.equal(res.status,202);
+  }
+  assert.equal(h.ids[0],h.ids[1]);
+  assert.equal(new Set(h.ids).size,3);
 });

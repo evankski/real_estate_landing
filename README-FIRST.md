@@ -19,13 +19,7 @@ Run `npm run build` after those edits and include the regenerated HTML in your
 next commit. `campaigns.css` and `campaigns.js` supply the shared presentation
 and optional browser enhancements.
 
-GitHub Pages cannot run the FUB API endpoint. C02 appointment requests require the hosted Worker for reliable capture and automatic email; see [C02 email setup](CAMPAIGN-02.md#turn-on-appointment-email). For other forms on a static host, an absent endpoint
-(404) or unsupported POST (405) sends the form through the existing FormSubmit
-email route to `evan@thewowski.com`. That email service must be activated for the
-recipient. Direct FUB delivery requires a separately hosted endpoint that keeps
-the API key private. The included Cloudflare Worker can handle that endpoint
-and the website; moving the static website is not a requirement for using FUB,
-but a separate endpoint would need its URL and origin settings connected.
+GitHub Pages serves the public forms. Each posts directly to the same Cloudflare Worker at the `websiteIntakeUrl` in `scripts/campaign-config.mjs` (the homepage HTML action must match). The Worker uses the existing Microsoft 365 mailbox and FUB credentials; no keys are included in the static files. The archived `/old/` URL leads to the current homepage form.
 
 Use an HTTP preview or the published website to view the full site and check
 form behavior. Campaign pages use root-relative URLs for their shared assets.
@@ -44,16 +38,7 @@ and restarts when its server code changes. Run `npm run build` after editing pag
 templates and refresh your browser for the updated HTML.
 Set `PORT` in `.env` to use another port.
 
-Without a local FUB key, valid forms on this loopback server open their next
-page in **preview mode**. The page identifies it as a preview: no email or CRM
-request is sent, no contact details are saved, and no Lead conversion is counted.
-Use sample details when testing. After setting a real key, restart the server:
-submitting other forms then sends a real FUB inquiry. The C02 appointment form on this Node preview always previews locally; test its durable capture and email with the Worker.
-
-The server loads `.env` with Node's native environment-file reader. Add your
-Follow Up Boss API key to `FUB_API_KEY` when ready. Never paste that key into
-`script.js`, HTML, a public config file, or a Git commit. `.env` is ignored by Git
-and cannot be served by the preview server or copied into the public build.
+The Node preview validates submissions locally without sending email, creating a CRM record, or counting a lead conversion. Enable JavaScript for the local preview; native posts to the public endpoint are blocked here. Use sample details. The private delivery queue runs on the Worker, not the Node server. Store production credentials in Worker secrets, never in HTML, browser scripts, or the repository.
 
 ## Follow Up Boss integration
 
@@ -83,22 +68,11 @@ FUB's documentation asks integrations to register a system and supply its
 assigned `X-System` and `X-System-Key` headers. Use your existing registration,
 or complete that setup with FUB when activating this integration.
 
-With `FUB_API_KEY`, only FUB HTTP 200 or 201 counts as accepted.
-FUB 204 means the lead source was archived and ignored, so the site treats it
-as failure. The usual upstream timeout is ten seconds. C02 appointment requests use the durable delivery described below; other forms do not retry ambiguous deliveries.
+Every submitted lead is saved before the browser receives an acknowledgment. The same private queue handles homepage inquiries, comparisons, buyer and seller plans, open-house requests, worksheet requests, and appointment requests. Microsoft 365 emails the submitted details to `evan@thewowski.com`, with the visitor as Reply-To. FUB gets the corresponding event using the same `FUB_API_KEY`. Only C02 phone appointments include a dated Outlook calendar draft; an inquiry or preferred time is not a confirmed appointment.
 
-For other forms on the public backend without a key, the server validates the inquiry and sends
-it to FormSubmit for `evan@thewowski.com`; the browser only contacts its own
-site. On a static host with no API (404/405), or an older public API reporting
-`NOT_CONFIGURED`, the browser uses form-encoded AJAX without a JSON preflight.
-Both routes require a positive provider response before counting a conversion.
-Email routing needs an activated FormSubmit recipient and does not import into
-FUB. FUB's Lead Flow controls assignment and any follow-up
-actions; review existing action plans and source configuration before activating
-API delivery. As of October 20, 2026, Evan has not decided whether to use
-automated follow-up or call recording, and no FUB account settings have been
-inspected or changed as part of this website work.
-C02 time requests are saved before acknowledgment. A private outbox sends email to Evan and independently delivers to FUB if configured. A temporary provider failure schedules another attempt; buyers don't write an email or wait for either provider. [Setup and verification](CAMPAIGN-02.md#turn-on-appointment-email).
+The two deliveries retry independently. Microsoft must return HTTP 202; FUB must return 200 or 201. A missing key, inactive source, or provider outage keeps the outstanding delivery pending. Retrying the same submission does not create a second job. A provider can accept a message yet lose the response; check the reference if two emails arrive. Once both deliveries are accepted, only a seven-day duplicate-prevention marker remains in the queue. [Microsoft setup and verification](CAMPAIGN-02.md#turn-on-appointment-email).
+
+The standard HTML contact and resource forms also submit directly to that Worker without JavaScript. No external form relay is used. Contact preferences, privacy requests, and self-guided checklist checkboxes do not enroll visitors in the CRM. FUB’s own lead-flow and automation settings remain under your control.
 
 Production form requests are accepted from `https://evankrealestate.com` and
 `https://www.evankrealestate.com`. Local requests must use the same loopback
@@ -159,8 +133,7 @@ Deploy when you intend to publish:
 npx wrangler deploy
 ```
 
-Connect `evankrealestate.com` and `www.evankrealestate.com` to this Worker in
-Cloudflare so assets and API share the intended domain. `wrangler.jsonc` binds
+Keep the public site on GitHub Pages and deploy the Worker for intake. `wrangler.jsonc` binds
 `dist/` as `ASSETS` and runs the Worker first for `/api/leads` and the homepage.
 The homepage maps to `index.html`; other HTML pages keep their existing `.html`
 URLs, matching their canonical links and sitemap.

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {websiteIntakeUrl} from '../scripts/campaign-config.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -193,6 +194,7 @@ test('the HTTP handler forwards Range headers and streams the partial response',
 
 test('public pages have appropriate media types and HEAD does not return body', async () => {
   const page = await serveAsset('/');
+  assert.equal(page.headers.get('Content-Security-Policy'), "form-action 'self'");
   assert.equal(page.status, 200);
   assert.match(page.headers.get('Content-Type'), /text\/html/);
   assert.match(await page.text(), /<!doctype html>/i);
@@ -292,4 +294,23 @@ test('C01 public worksheet is served as a PDF and private or unapproved resource
   for (const path of ['/resources/private.pdf', '/scripts/shortlist-config.mjs', '/scripts/generate-shortlist.mjs']) {
     assert.equal((await serveAsset(path)).status, 404);
   }
+});
+
+test('all generated lead forms and the homepage declare the shared intake, including the native HTML action', async () => {
+  const covered=[];
+  for(const file of (await listPublicFiles(SITE_ROOT)).filter(f=>f.endsWith('.html'))) {
+    const html=await readFile(join(SITE_ROOT,file),'utf8');
+    for(const [tag] of html.matchAll(/<form\b[^>]*>/gi)) {
+      assert.equal(tag.match(/\baction="([^"]+)"/i)?.[1],websiteIntakeUrl,file);
+      assert.match(tag,/\bmethod="post"/i,file);
+      covered.push(file);
+    }
+  }
+  for(const file of ['index.html','compare/index.html','buyer-plan/index.html','seller-plan/index.html','open-house/index.html',
+    'book/compare/index.html','book/buyer-plan/index.html','book/seller-plan/index.html',
+    'compare-homes/index.html','book/home-shortlist/index.html']) assert.ok(covered.includes(file),file);
+  assert.equal(covered.filter(f=>f==='first-purchase/index.html').length,2);
+  const archive=await readFile(join(SITE_ROOT,'old/index.html'),'utf8');
+  assert.doesNotMatch(archive,/<form\b/i);
+  assert.match(archive,/href="\/#contact"/);
 });

@@ -20,7 +20,7 @@ Change `utm_content` for each creative. Use campaign labels only, never contact 
 
 ## Lead and scheduling behavior
 
-Both forms use the existing `/api/leads` integration and existing FormSubmit fallback when the endpoint is explicitly unavailable or unconfigured. An ambiguous delivery failure does not trigger another automatic send.
+Both forms use the shared Worker. It saves the request, then emails Evan through Microsoft 365 and sends the same inquiry to FUB. Each destination retries independently.
 
 The server sends C01 inquiries through Follow Up Boss's documented `POST /v1/events`, type `General Inquiry`. Campaign, route version, request type, preparation details and inquiry-only permission are included in the message. Existing UTMs are preserved in campaign data. See the [FUB events documentation](https://docs.followupboss.com/reference/events-post).
 
@@ -55,7 +55,7 @@ Run `npm run build`. The generator validates local video/poster/caption files. U
 ## Before paid traffic
 
 1. Deploy the generated pages and worksheet to the existing site. GitHub Pages serves static files; the server-side FUB endpoint requires the separate backend described in `README-FIRST.md`.
-2. Confirm the deployment's FUB key. No local `.env` was configured during this build, and live CRM delivery was not tested. Email fallback success does not establish a FUB import.
+2. Check that both deliveries are accepted. Receipt in one service does not establish receipt in the other.
 3. Test one authorized inquiry on the deployed site and verify arrival, C01 attribution and permission in the intended inbox/CRM. Automated tests use stubbed services and create no real leads. Verify the Pixel in Events Manager too.
 4. Add the recording before running video-promising ads, or accurately offer the worksheet and written example currently available.
 5. Confirm the introductory review scope with WR Properties and resolve existing representation before personalized work. Ongoing services and negotiable fees are separate.

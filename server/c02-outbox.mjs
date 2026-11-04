@@ -1,27 +1,38 @@
 import {submitFubEvent} from './fub-event.mjs';
 import {sendMicrosoftAppointment} from './c02-microsoft-mail.mjs';
 
-// One private Durable Object per logical appointment request. An acknowledgment
+import {worksheetCampaigns} from './worksheet-campaigns.mjs';
+
+// One private Durable Object per logical website inquiry. An acknowledgment
 // means the job and its alarm were committed, not that an appointment is booked.
 export const bookingInbox = 'evan@thewowski.com';
 
-export async function saveAppointment(namespace, lead, payload, useFub) {
+export async function queueInquiry(namespace, lead, payload) {
   // A lost HTTP response, a double click, and a retry from a refreshed tab
   // produce the same job. Actual changes to the plan create a fresh request.
-  const identity = [lead.email.toLowerCase(), lead.firstName, lead.lastName, lead.preferredTimeOne,
+  const appointment = lead.requestType === worksheetCampaigns.C02.manualType;
+  // Preserve existing C02 IDs and pending jobs across deployment.
+  const appointmentIdentity = [lead.email.toLowerCase(), lead.firstName, lead.lastName, lead.preferredTimeOne,
     lead.timezone, lead.buyingArea, lead.moveTiming, lead.lenderStatus, lead.representationStatus, lead.message];
-  if (lead.phone) identity.push(lead.phone.replace(/\D/g, ''));
+  if (lead.phone) appointmentIdentity.push(lead.phone.replace(/\D/g, ''));
+  const {submittedAt, referrerOrigin, cookieChoice, ctaSource, ...answers} = lead;
+  const identity = appointment ? appointmentIdentity : ['website', {...answers, email:lead.email.toLowerCase()}];
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(identity)));
   const key = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
-  const job = {key, payload, time:lead.preferredTimeOne, email:lead.email, name:[lead.firstName,lead.lastName].filter(Boolean).join(' '),
-    emailPending:true, fubPending:useFub, attempts:0};
+  const job = {key, payload, kind:appointment ? 'appointment' : 'inquiry', title:lead.requestType || 'Website inquiry', time:lead.preferredTimeOne, email:lead.email, name:[lead.firstName,lead.lastName].filter(Boolean).join(' '),
+    emailPending:true, fubPending:true, attempts:0};
   const stub = namespace.get(namespace.idFromName(key));
   const receipt = await stub.fetch('https://outbox.internal/save', {method:'POST',body:JSON.stringify(job)});
-  if (receipt.status !== 201) throw new Error('Appointment was not saved');
+  if (receipt.status !== 201) throw new Error('Inquiry was not saved');
 }
 
 export function bookingEmail(job) {
   const phone = job.payload.person.phones?.[0]?.value;
+  if (job.kind === 'inquiry') return {from:'appointments@mail.evankrealestate.com', to:bookingInbox, replyTo:job.email,
+    subject:job.title + ' | ' + job.name,
+    text:[job.name + ' sent a website inquiry.', 'Reply to: ' + job.email, ...(phone ? ['Phone: ' + phone] : []),
+      '', job.payload.message, '', 'Request reference: ' + job.key.slice(0,16)].join('\n')};
+  // Older pending appointments have no kind.
   return {from:'appointments@mail.evankrealestate.com', to:bookingInbox, replyTo:job.email,
     subject:'First Home Game Plan | ' + job.time,
     text:[job.name + ' requested a 20-minute call.', 'Reply to: ' + job.email,
@@ -61,7 +72,7 @@ export class C02AppointmentOutbox {
       finally { clearTimeout(timer); }
       if (!job.emailPending) {
         await this.storage.put('job',job);
-        console.info('C02 delivery accepted', {reference:job.key.slice(0,16), channel:'email'});
+        console.info('Website delivery accepted', {reference:job.key.slice(0,16), channel:'email'});
       }
     }
     if (job.fubPending) {
@@ -74,7 +85,7 @@ export class C02AppointmentOutbox {
       } catch (e) { this.logRetry(job,'FUB',e); }
       if (!job.fubPending) {
         await this.storage.put('job',job);
-        console.info('C02 delivery accepted', {reference:job.key.slice(0,16), channel:'FUB'});
+        console.info('Website delivery accepted', {reference:job.key.slice(0,16), channel:'FUB'});
       }
     }
     if (!job.emailPending && !job.fubPending) {
@@ -106,6 +117,6 @@ export class C02AppointmentOutbox {
   }
   logRetry(job,channel,error) {
     const code = /^[A-Z0-9_]{1,60}$/.test(error?.code) ? error.code : 'UNCONFIRMED';
-    console.warn('C02 delivery retry', {reference:job.key.slice(0,16), channel, attempt:job.attempts, code});
+    console.warn('Website delivery retry', {reference:job.key.slice(0,16), channel, attempt:job.attempts, code});
   }
 }

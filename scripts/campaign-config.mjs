@@ -14,9 +14,10 @@ export const site = {
   address: '613 1st Street, Suite 211, Brentwood, CA 94513',
 };
 
-// For static hosting on the custom domain, set this to the deployed Worker's
-// HTTPS /api/leads URL. Empty means the API is served on the site's own origin.
-export const firstHomeIntakeUrl = 'https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads';
+// The public address of the shared, server-side intake. No credentials are published.
+export const websiteIntakeUrl = 'https://evan-karwowski-real-estate.evan-karwowski.workers.dev/api/leads';
+if (!/^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev\/api\/leads$/.test(websiteIntakeUrl))
+  throw new Error('Website intake must be the verified HTTPS workers.dev /api/leads endpoint.');
 
 export const campaigns = {
   compare: {

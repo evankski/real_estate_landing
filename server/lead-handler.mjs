@@ -1,14 +1,11 @@
 import { worksheetCampaigns } from './worksheet-campaigns.mjs';
 import { firstHomeAppointment } from './first-home-appointment.mjs';
-import { saveAppointment } from './c02-outbox.mjs';
-import { submitFubEvent } from './fub-event.mjs';
+import { queueInquiry } from './c02-outbox.mjs';
 
 const worksheets = Object.values(worksheetCampaigns);
 
-const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/evan@thewowski.com';
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 const MAX_BODY_BYTES = 16_384;
-const REQUEST_TIMEOUT_MS = 10_000;
 const PAID_MEDIA = new Set(['paid', 'ad', 'ads', 'paidmedia', 'paidsocial', 'socialpaid', 'paidsearch',
   'paidvideo', 'display', 'ppc', 'cpc', 'cpm', 'retargeting', 'remarketing']);
 const CHANNEL_NAMES = new Map([
@@ -84,7 +81,7 @@ function permittedOrigin(request) {
   return null;
 }
 
-async function readJson(request) {
+async function readFields(request, native) {
   const length = request.headers.get('Content-Length');
   if (length && (!/^\d+$/.test(length) || Number(length) > MAX_BODY_BYTES)) throw new BodyTooLarge();
   if (!request.body) throw new InvalidInput();
@@ -112,7 +109,8 @@ async function readJson(request) {
     position += chunk.byteLength;
   }
   try {
-    const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buffer));
+    const body = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    const data = native ? Object.fromEntries(new URLSearchParams(body)) : JSON.parse(body);
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new InvalidInput();
     return data;
   } catch {
@@ -362,44 +360,18 @@ function eventPayload(lead, system) {
   return payload;
 }
 
-async function emailInquiry(lead, payload, { fetchImpl, origin, signal }) {
-  // The provider envelope and recipient are server-controlled.
-  const email = await fetchImpl(EMAIL_ENDPOINT, {
-    method: 'POST', redirect: 'manual', signal,
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Referer: origin + '/' },
-    body: JSON.stringify({
-      name: [lead.firstName, lead.lastName].filter(Boolean).join(' '),
-      email: lead.email, ...(lead.phone ? { phone: lead.phone } : {}),
-      message: payload.message,
-      _subject: (lead.requestType || 'Website inquiry') + ' | Evan Karwowski',
-      _url: origin + (lead.landingPage || '/'), _template: 'table', _captcha: 'false'
-    })
-  });
-  if (!email.ok) { await email.body?.cancel(); return false; }
-  const result = await email.json();
-  return result?.success === true || result?.success === 'true';
+// Never use a client-supplied redirect or include form answers in the URL.
+function nextPage(lead) {
+  const sheet = worksheetCampaigns[lead.campaignId];
+  if (sheet) return lead.requestType === sheet.resourceType ? (sheet.sheetThanks || sheet.watch) : sheet.thanks;
+  if (SCHEDULING_REQUESTS.includes(lead.requestType)) return '/thanks/booking/';
+  const paths = {C1:'compare', C2:'buyer-plan', C3:'seller-plan', C4:'open-house'};
+  return paths[lead.campaignId] ? '/thanks/' + paths[lead.campaignId] + '/' : '/thanks.html';
 }
 
-// Non-appointment forms still deliver synchronously.
-async function attemptDelivery(send, timeoutMs) {
-  const controller = new AbortController();
-  let timer;
-  try {
-    const accepted = await Promise.race([
-      send(controller.signal),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          controller.abort();
-          reject(new Error('upstream-timeout'));
-        }, timeoutMs);
-      })
-    ]);
-    return accepted ? 'accepted' : 'unconfirmed';
-  } catch {
-    return controller.signal.aborted ? 'timeout' : 'unconfirmed';
-  } finally {
-    clearTimeout(timer);
-  }
+function nativeError(status, message) {
+  return new Response('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Inquiry not saved</title><main><h1>Your inquiry wasn’t saved.</h1><p>' + message + '</p><p>You can also <a href="mailto:evan@thewowski.com">email Evan</a> or <a href="sms:+19254927023">text 925-492-7023</a>.</p></main></html>',
+    {status, headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 }
 
 /**
@@ -422,42 +394,27 @@ export async function handleLead(request, env = {}) {
     });
   }
   if (request.method !== 'POST') return reply(405, 'METHOD_NOT_ALLOWED', origin);
-  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') || '')) {
+  const type = (request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+  const native = type === 'application/x-www-form-urlencoded';
+  if (!native && type !== 'application/json') {
     return reply(415, 'UNSUPPORTED_MEDIA_TYPE', origin);
   }
   let lead;
   try {
-    lead = normalizeLead(await readJson(request));
+    lead = normalizeLead(await readFields(request, native));
   } catch (error) {
+    if (native) return nativeError(error instanceof BodyTooLarge ? 413 : 400, 'Go back and check your contact details, the required fields, and permission to reply.');
     return reply(error instanceof BodyTooLarge ? 413 : 400, error instanceof BodyTooLarge ? 'PAYLOAD_TOO_LARGE' : 'INVALID_INPUT', origin);
   }
 
-  const apiKey = typeof env.FUB_API_KEY === 'string' ? env.FUB_API_KEY.trim() : '';
-  const manual = lead.requestType === worksheetCampaigns.C02.manualType;
-  if ((manual ? !env.C02_OUTBOX : !apiKey) && origin === new URL(request.url).origin && LOOPBACK_HOSTS.has(new URL(origin).hostname)) {
-    // The local walkthrough can be exercised without retaining or transmitting a lead.
-    return reply(200, 'LOCAL_PREVIEW', origin);
+  if (!env.C02_OUTBOX && LOOPBACK_HOSTS.has(new URL(origin).hostname)) return reply(200, 'LOCAL_PREVIEW', origin);
+  const system = env.FUB_SYSTEM?.trim() || 'EvanKarwowskiWebsite';
+  try {
+    await queueInquiry(env.C02_OUTBOX, lead, eventPayload(lead, system));
+  } catch {
+    console.error('Website inquiry storage unavailable');
+    return native ? nativeError(503, 'Please go back and try again.') : reply(503, 'INTAKE_UNAVAILABLE', origin);
   }
-  const system = typeof env.FUB_SYSTEM === 'string' && env.FUB_SYSTEM.trim()
-    ? env.FUB_SYSTEM.trim() : 'EvanKarwowskiWebsite';
-  const payload = eventPayload(lead, system);
-  if (manual) {
-    try {
-      await saveAppointment(env.C02_OUTBOX, lead, payload, Boolean(apiKey));
-      return reply(202, null, origin, {email:'queued', fub:apiKey ? 'queued' : 'not_configured'});
-    } catch {
-      console.error('C02 appointment storage unavailable');
-      return reply(503, 'INTAKE_UNAVAILABLE', origin);
-    }
-  }
-  const config = { apiKey, system, systemKey: env.FUB_SYSTEM_KEY, fetchImpl: env.fetch || globalThis.fetch, origin };
-  const fub = apiKey
-    ? await attemptDelivery(signal => submitFubEvent(payload, { ...config, signal }), REQUEST_TIMEOUT_MS)
-    : 'not_configured';
-  const email = !apiKey
-    ? await attemptDelivery(signal => emailInquiry(lead, payload, { ...config, signal }), REQUEST_TIMEOUT_MS)
-    : 'not_requested';
-  if (fub === 'accepted' || email === 'accepted') return reply(200, null, origin);
-  const timedOut = fub === 'timeout' || email === 'timeout';
-  return reply(timedOut ? 504 : 502, timedOut ? 'DELIVERY_TIMEOUT' : 'DELIVERY_FAILED', origin);
+  if (native) return new Response(null, {status:303, headers:{Location:origin + nextPage(lead), 'Cache-Control':'no-store'}});
+  return reply(202, null, origin, {email:'queued', fub:'queued'});
 }

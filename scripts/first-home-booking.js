@@ -140,9 +140,8 @@ window.initFirstHomeBooking = function ({sendInquiry, measure, context}) {
         'Open in Outlook': appointment.outlookUrl,
         campaign_id: 'C02', request_type: form.dataset.requestType, route_version: form.dataset.version,
         interest: 'Buying a home', contact_method: 'call', meeting_format: 'Phone', cta_source: 'C02 manual time request',
-        _subject: 'First Home Game Plan request | ' + appointment.label, _template: 'table',
         marketing_permission: 'Inquiry response only.'
-      }, controller.signal, form.dataset.intake);
+      }, controller.signal, form.action);
       if (result === 'preview') {
         say('Local preview for ' + appointment.label + '. No email was sent or time reserved.', 'preview');
         previewDraft.href = appointment.outlookUrl;

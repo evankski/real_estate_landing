@@ -52,7 +52,7 @@ Create the complete public build:
 npm run build
 ```
 
-The build regenerates the campaign pages and copies permitted public assets into `dist/`. Keep generated HTML in version control alongside its source configuration. GitHub Pages can serve the generated HTML directly; it cannot execute the `/api/leads` backend. See `README-FIRST.md` for the existing server/FUB setup and FormSubmit fallback requirements. This page work does not deploy anything.
+The build regenerates the campaign pages and copies permitted public assets into `dist/`. Keep generated HTML in version control alongside its source configuration. GitHub Pages can serve the generated HTML directly; it cannot execute the `/api/leads` backend. See `README-FIRST.md` for the shared Worker, Microsoft 365 email and FUB setup. This page work does not deploy anything.
 
 ## Sample video and replacement
 
@@ -97,7 +97,7 @@ Check the listing role, event status and media rights before publication; update
 - No booking provider or live calendar was supplied. The `/book/` pages collect a time request; Evan confirms availability afterward. They do not reserve a slot or synchronize calendars.
 - The C2 emailed checklist is a request for Evan to fulfill personally. There is no automatic resource email/attachment service. A personalized outline is requested only when the visitor selects its separate unchecked option.
 - `/preferences/` offers direct contact instructions; it is not an authenticated CRM preferences portal.
-- The existing secure lead endpoint and its documented fallback handle inquiries. This work does not add the manual’s broader durable outbox, CRM reconciliation worker, calendar webhooks or reminder system.
+- The shared Worker durably queues every inquiry for email to Evan and delivery to FUB. No CRM reconciliation service, calendar webhooks or automated reminders are configured.
 - No ads, retargeting audiences, marketing sequences or external accounts are launched or configured by these pages. Separately, Evan authorized Meta Pixel activation on October 20, 2026. PageView and accepted-inquiry Lead measurement require a fresh tracking opt-in; saved opt-outs and GPC remain honored. This does not create marketing consent. See `facebook-pixel-setup.md`.
 
 Before paid traffic, verify the real deployed form-to-inbox/CRM path and Evan’s fulfillment process. Add real videos and booking integration when available; do not substitute “sent,” “booked” or “delivered” claims for actions the system has not completed.

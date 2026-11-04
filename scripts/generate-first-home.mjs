@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { bookingLinks, firstHomeIntakeUrl, site, videos } from './campaign-config.mjs';
+import { bookingLinks, websiteIntakeUrl, site, videos } from './campaign-config.mjs';
 import { firstHomeAlias, worksheetCampaigns } from '../server/worksheet-campaigns.mjs';
 import { firstHomeAppointment } from '../server/first-home-appointment.mjs';
 
@@ -21,8 +21,6 @@ function alias(target) {
 }
 
 function scheduling(ui, bookingUrl) {
-  if (firstHomeIntakeUrl && !/^https:\/\/[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev\/api\/leads$/.test(firstHomeIntakeUrl))
-    throw new Error('C02 intake must be the verified HTTPS workers.dev /api/leads endpoint.');
   const { field, input, esc } = ui;
   const choices = (name, question, answers) => `<fieldset class="full-span c02-choice-group"><legend>${esc(question)}</legend>
     <div class="c02-choices">${answers.map(([value, label = value]) =>
@@ -32,7 +30,7 @@ function scheduling(ui, bookingUrl) {
   <p>Tell me a little about your plans so we can spend the call on what matters to you.</p>
   ${bookingUrl ? '' : '<p>Choose the date and time you’d like for our 20-minute call. I’ll check my calendar and email you to confirm.</p>'}</div>
   <div><noscript><p><a href="mailto:evan@thewowski.com?subject=First%20Home%20Game%20Plan">Email Evan to arrange the call</a> and include your time zone.</p></noscript>
-  <form id="c02-preparation" class="contact-form c02-form" data-calendar="${esc(bookingUrl || '')}" data-intake="${esc(firstHomeIntakeUrl)}" data-request-type="${esc(c.manualType)}" data-version="${esc(c.phoneBookingVersion)}" method="post" action="/first-purchase/#booking" hidden>
+  <form id="c02-preparation" class="contact-form c02-form" data-calendar="${esc(bookingUrl || '')}" data-request-type="${esc(c.manualType)}" data-version="${esc(c.phoneBookingVersion)}" method="post" action="${esc(websiteIntakeUrl)}" hidden>
   <input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" hidden>
   <fieldset id="c02-questions"><legend>A little about your plans</legend><div class="form-grid">
   ${field('Where are you considering buying?', input('buying_area', 160, 'required placeholder="A town, a few areas, or still exploring"'), true)}
