@@ -2,6 +2,25 @@
 
 **November 3, 2026 · evankrealestate.com · Organic website only**
 
+**Follow-up, November 10:** Search Console is now verified and accessible. The account's current indexing findings and completed submissions are recorded below; the November 3 findings remain the historical baseline.
+
+## November 10: verified Search Console findings
+
+The signed-in domain property `sc-domain:evankrealestate.com` showed **5 indexed and 20 not indexed** in its report last updated November 5. This is a delayed report, not a real-time count. The homepage's stored crawl was November 2, before the SEO release. The Brentwood guide still had an October 14 404 crawl record. The area directory and Brentwood tax comparison guide were discovered but had no recorded crawl.
+
+Completed in Search Console on November 10:
+
+- Submitted `https://evankrealestate.com/sitemap.xml` to the previously empty Sitemaps report. Google reported **Sitemap processed successfully**, last read November 10, **26 discovered pages**. Discovered does not mean indexed.
+- Ran Google's live test for the Brentwood guide: **URL is available to Google**, **Page can be indexed**, and one valid breadcrumb item.
+- Requested indexing for the homepage, `/areas/`, `/areas/brentwood-ca-real-estate.html`, and `/guides/compare-brentwood-homes/`. Google confirmed all four were added to its priority crawl queue. Acceptance is not an indexing or ranking guarantee.
+- Checked all 15 URLs in the 404 issue. Thirteen now return HTTP 200 directly; two www URLs redirect to live apex pages. The returned pages have the intended canonical and no indexing block. Started issue validation and verified **Validation started — November 10**. Validation has not yet finished.
+
+Next check: look for crawls after November 10, updated exclusion reasons, and indexing of the priority guides. Do not repeatedly resubmit the same URLs. Google says crawling can take days to weeks and requests do not guarantee inclusion. [Recrawl guidance](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl).
+
+No public website code, campaign pages, analytics, or lead delivery changed during this follow-up. Business Profile creation is user-reported; its verification and visibility were not established by this Search Console check.
+
+## Original November 3 audit
+
 **Start in Brentwood.** That is where Evan grew up, went to school and works through a licensed brokerage. The homepage can answer “Which Brentwood agent should I talk to?” while the city guide answers “What should I check before buying or selling here?” The other five priority markets deserve their own useful pages. A Brentwood office address is not evidence of an office in each of them.
 
 **The largest remaining gaps are outside the website:** Evan has not set up a personal Google Business Profile or verified Search Console. There is no trustworthy starting rank, first-party search traffic, map visibility, or organic conversion rate to report. A public search sample surfaced the older `/index.html` URL and cookie policy, but did not surface a city guide. That sample is neither a full index count nor a rank measured from a Brentwood phone. [Google’s site-search limitations](https://developers.google.com/search/docs/monitor-debug/search-operators/all-search-site).
